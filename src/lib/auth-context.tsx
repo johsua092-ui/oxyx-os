@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const isOwner = profile?.role === 'owner' || user?.email === 'johusa098@gmail.com';
+  const isOwner = profile?.role === 'owner' || user?.email === 'johsua092@gmail.com';
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isOwner }}>

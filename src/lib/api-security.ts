@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Owner email - unrestricted access
-const OWNER_EMAIL = 'johusa098@gmail.com';
+const OWNER_EMAIL = 'johsua092@gmail.com';
 
 // ─── JWT Decoder (Firebase ID Token) ────────────────────────
 interface TokenPayload {

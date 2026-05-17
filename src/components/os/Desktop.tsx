@@ -112,6 +112,19 @@ export const Desktop: React.FC = () => {
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(20,20,35,0.8),rgba(0,0,0,1))]" />
         
+        {/* Subtle grid pattern */}
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
+            `,
+            backgroundSize: '60px 60px',
+          }}
+        />
+
+        {/* Animated aurora blobs */}
         <motion.div 
           className="absolute w-[50vw] h-[50vw] rounded-full blur-[150px] opacity-[0.07]"
           style={{ top: '10%', left: '20%', background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}
@@ -130,6 +143,31 @@ export const Desktop: React.FC = () => {
           animate={{ x: [0, 30, -40, 0], y: [0, -50, 20, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
         />
+
+        {/* Floating micro-particles */}
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={`particle-${i}`}
+            className="absolute w-[2px] h-[2px] rounded-full bg-white/10"
+            style={{
+              top: `${10 + (i * 7) % 80}%`,
+              left: `${5 + (i * 13) % 90}%`,
+            }}
+            animate={{
+              y: [0, -30, 0],
+              opacity: [0.05, 0.15, 0.05],
+            }}
+            transition={{
+              duration: 6 + (i % 4) * 2,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: i * 0.5,
+            }}
+          />
+        ))}
+
+        {/* Corner vignette */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_40%,rgba(0,0,0,0.5)_100%)]" />
 
         {/* Film grain */}
         <div 

@@ -53,7 +53,7 @@ export async function syncUserProfile(uid: string, email: string, displayName: s
     return { ...existing, ...updated };
   } else {
     // New user — create profile
-    const isOwner = email === 'johusa098@gmail.com';
+    const isOwner = email === 'johsua092@gmail.com';
     const profile: UserProfile = {
       uid,
       email,
