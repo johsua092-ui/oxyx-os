@@ -8,10 +8,10 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { syncUserProfile, logSystemEvent } from '@/lib/firestore';
-import { Lock, Mail, AlertCircle, ArrowRight, Eye, EyeOff, Shield } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ArrowRight, Eye, EyeOff, Shield, KeyRound } from 'lucide-react';
 
 // Max login attempts before temporary lockout
 const MAX_ATTEMPTS = 5;
@@ -25,6 +25,7 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [recoveryMsg, setRecoveryMsg] = useState('');
 
   const isLocked = lockedUntil && Date.now() < lockedUntil;
 
@@ -243,6 +244,44 @@ export const LoginScreen: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Forgot Password */}
+          <div className="text-center">
+            <button
+              type="button"
+              disabled={!!isLocked}
+              onClick={async () => {
+                if (!email.trim()) {
+                  setError('Enter your email first, then click recovery.');
+                  return;
+                }
+                try {
+                  await sendPasswordResetEmail(auth, email);
+                  setError('');
+                  setRecoveryMsg('Recovery link sent to your email.');
+                  await logSystemEvent('password_reset_requested', { email });
+                } catch {
+                  setError('Failed to send recovery email. Check the address.');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-[10px] text-white/20 hover:text-white/40 transition-colors tracking-wider disabled:opacity-20"
+            >
+              <KeyRound size={10} />
+              Forgot Password?
+            </button>
+          </div>
+
+          {/* Recovery success message */}
+          {recoveryMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/5 border border-green-500/10"
+            >
+              <Mail size={12} className="text-green-400/50 shrink-0" />
+              <p className="text-[10px] text-green-400/60">{recoveryMsg}</p>
+            </motion.div>
+          )}
         </motion.form>
 
         {/* Security badge — NO register button */}
