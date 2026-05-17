@@ -30,12 +30,12 @@ const ClockWidget: React.FC = () => {
   return (
     <div className="text-right">
       <div className="flex items-baseline gap-1 justify-end">
-        <span className="text-[48px] font-extralight text-white/60 tracking-tight leading-none">{hours}</span>
-        <span className="text-[48px] font-extralight text-white/15 tracking-tight leading-none animate-pulse">:</span>
-        <span className="text-[48px] font-extralight text-white/60 tracking-tight leading-none">{minutes}</span>
-        <span className="text-[20px] font-light text-white/15 tracking-tight leading-none ml-1">{seconds}</span>
+        <span className="text-[48px] font-extralight text-white/80 tracking-tight leading-none">{hours}</span>
+        <span className="text-[48px] font-extralight text-white/30 tracking-tight leading-none animate-pulse">:</span>
+        <span className="text-[48px] font-extralight text-white/80 tracking-tight leading-none">{minutes}</span>
+        <span className="text-[20px] font-light text-white/30 tracking-tight leading-none ml-1">{seconds}</span>
       </div>
-      <p className="text-[12px] text-white/15 tracking-wider mt-2 uppercase">{dateStr}</p>
+      <p className="text-[12px] text-white/35 tracking-wider mt-2 uppercase">{dateStr}</p>
     </div>
   );
 };
@@ -57,10 +57,10 @@ const SystemWidget: React.FC = () => {
   };
 
   const stats = [
-    { icon: Shield, label: 'Security', value: 'Active', color: 'text-emerald-500/50' },
-    { icon: Cpu, label: 'AI Engine', value: 'Online', color: 'text-blue-400/50' },
-    { icon: Wifi, label: 'Network', value: 'Connected', color: 'text-cyan-400/50' },
-    { icon: Activity, label: 'Uptime', value: formatUptime(uptime), color: 'text-purple-400/50' },
+    { icon: Shield, label: 'Security', value: 'Active', color: 'text-emerald-400/70' },
+    { icon: Cpu, label: 'AI Engine', value: 'Online', color: 'text-sky-400/70' },
+    { icon: Wifi, label: 'Network', value: 'Connected', color: 'text-teal-400/70' },
+    { icon: Activity, label: 'Uptime', value: formatUptime(uptime), color: 'text-amber-400/70' },
   ];
 
   return (
@@ -71,11 +71,11 @@ const SystemWidget: React.FC = () => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 1 + i * 0.1 }}
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]"
         >
           <Icon size={14} strokeWidth={1.5} className={color} />
-          <span className="text-[11px] text-white/25 flex-1">{label}</span>
-          <span className="text-[11px] text-white/35 font-mono">{value}</span>
+          <span className="text-[11px] text-white/50 flex-1">{label}</span>
+          <span className="text-[11px] text-white/60 font-mono">{value}</span>
         </motion.div>
       ))}
     </div>
@@ -108,69 +108,41 @@ export const Desktop: React.FC = () => {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-black selection:bg-white/20 text-white/80">
-      {/* Dynamic Wallpaper — Deep Blue / Teal */}
+      {/* Dynamic Wallpaper — Dark Charcoal + Warm Slate */}
       <div className="absolute inset-0 z-0">
-        {/* Base: dark navy gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a1628] via-[#0c1220] to-[#050a12]" />
+        {/* Base: rich dark gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#121418] via-[#0e1015] to-[#0a0b0e]" />
 
-        {/* Top-left warm blue glow */}
+        {/* Top-left warm slate glow */}
         <motion.div 
-          className="absolute rounded-full blur-[160px]"
-          style={{ width: '55vw', height: '55vw', top: '-10%', left: '-10%', background: 'linear-gradient(135deg, #1e3a5f, #1a4a6e)' }}
-          animate={{ x: [0, 30, -15, 0], y: [0, 20, -10, 0] }}
-          transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+          className="absolute rounded-full blur-[200px]"
+          style={{ width: '60vw', height: '60vw', top: '-15%', left: '-10%', background: 'linear-gradient(135deg, #1c1f26, #252830)' }}
+          animate={{ x: [0, 20, -10, 0], y: [0, 15, -8, 0] }}
+          transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
         />
 
-        {/* Center-right teal accent */}
+        {/* Center-right subtle warmth */}
         <motion.div 
-          className="absolute rounded-full blur-[140px]"
-          style={{ width: '40vw', height: '40vw', top: '30%', right: '-5%', background: 'linear-gradient(200deg, #0d4f5c, #0a3d4a)' }}
-          animate={{ x: [0, -25, 15, 0], y: [0, -15, 25, 0] }}
+          className="absolute rounded-full blur-[180px]"
+          style={{ width: '45vw', height: '45vw', top: '25%', right: '-8%', background: 'linear-gradient(200deg, #1a1d24, #1f2229)' }}
+          animate={{ x: [0, -15, 10, 0], y: [0, -10, 18, 0] }}
+          transition={{ duration: 38, repeat: Infinity, ease: "linear" }}
+        />
+
+        {/* Bottom deep */}
+        <motion.div 
+          className="absolute rounded-full blur-[170px]"
+          style={{ width: '50vw', height: '50vw', bottom: '-20%', left: '25%', background: 'linear-gradient(45deg, #14161c, #181b22)' }}
+          animate={{ x: [0, 12, -18, 0], y: [0, -12, 8, 0] }}
           transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
         />
 
-        {/* Bottom cool blue */}
-        <motion.div 
-          className="absolute rounded-full blur-[150px]"
-          style={{ width: '50vw', height: '50vw', bottom: '-15%', left: '20%', background: 'linear-gradient(45deg, #0f2847, #0c3155)' }}
-          animate={{ x: [0, 20, -30, 0], y: [0, -20, 10, 0] }}
-          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-        />
-
-        {/* Subtle cyan highlight */}
-        <div className="absolute top-[20%] left-[30%] w-[30vw] h-[30vw] rounded-full blur-[120px] bg-cyan-600/[0.06]" />
-
-        {/* Mesh gradient overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: `
-              radial-gradient(at 20% 30%, rgba(14, 116, 144, 0.3) 0%, transparent 50%),
-              radial-gradient(at 80% 20%, rgba(30, 58, 95, 0.3) 0%, transparent 50%),
-              radial-gradient(at 50% 80%, rgba(12, 74, 110, 0.2) 0%, transparent 50%),
-              radial-gradient(at 90% 70%, rgba(6, 78, 92, 0.15) 0%, transparent 50%)
-            `,
-          }}
-        />
-
-        {/* Grid pattern */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
-            `,
-            backgroundSize: '50px 50px',
-          }}
-        />
-
         {/* Corner vignette */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_40%,rgba(3,7,15,0.5)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_40%,rgba(0,0,0,0.4)_100%)]" />
 
         {/* Film grain */}
         <div 
-          className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay"
+          className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"
           style={{ 
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
             backgroundSize: '128px 128px'
@@ -280,19 +252,19 @@ export const Desktop: React.FC = () => {
           transition={{ delay: 1.2 }}
           className="absolute top-10 left-10 z-[5]"
         >
-          <p className="text-[11px] text-white/10 tracking-[0.3em] uppercase mb-2">Welcome back</p>
-          <h1 className="text-[28px] font-extralight text-white/30 tracking-wide">
+          <p className="text-[11px] text-white/30 tracking-[0.3em] uppercase mb-2">Welcome back</p>
+          <h1 className="text-[28px] font-extralight text-white/70 tracking-wide">
             {user?.displayName || user?.email?.split('@')[0] || 'User'}
           </h1>
-          <p className="text-[11px] text-white/10 mt-1 max-w-[200px] leading-relaxed">
+          <p className="text-[11px] text-white/30 mt-1 max-w-[200px] leading-relaxed">
             Your workspace is ready. All systems operational.
           </p>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/10 transition-all group"
+            className="flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/15 transition-all group"
           >
-            <LogOut size={10} className="text-white/15 group-hover:text-white/30" />
-            <span className="text-[9px] text-white/15 group-hover:text-white/30 tracking-wider">Sign Out</span>
+            <LogOut size={10} className="text-white/30 group-hover:text-white/50" />
+            <span className="text-[9px] text-white/30 group-hover:text-white/50 tracking-wider">Sign Out</span>
           </button>
         </motion.div>
 

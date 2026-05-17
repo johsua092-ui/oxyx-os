@@ -98,22 +98,22 @@ export const LoginScreen: React.FC = () => {
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black selection:bg-white/20">
       {/* Background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a1628] via-[#0c1220] to-[#050a12]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#121418] via-[#0e1015] to-[#0a0b0e]" />
         <motion.div
-          className="absolute w-[55vw] h-[55vw] rounded-full blur-[160px]"
-          style={{ top: '10%', left: '20%', background: 'linear-gradient(135deg, #1e3a5f, #1a4a6e)' }}
-          animate={{ x: [0, 40, -20, 0], y: [0, 30, -15, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute w-[60vw] h-[60vw] rounded-full blur-[200px]"
+          style={{ top: '10%', left: '15%', background: 'linear-gradient(135deg, #1c1f26, #252830)' }}
+          animate={{ x: [0, 30, -15, 0], y: [0, 20, -10, 0] }}
+          transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
         />
         <motion.div
-          className="absolute w-[40vw] h-[40vw] rounded-full blur-[140px]"
-          style={{ bottom: '5%', right: '10%', background: 'linear-gradient(200deg, #0d4f5c, #0a3d4a)' }}
-          animate={{ x: [0, -30, 20, 0], y: [0, -20, 30, 0] }}
+          className="absolute w-[45vw] h-[45vw] rounded-full blur-[180px]"
+          style={{ bottom: '0%', right: '5%', background: 'linear-gradient(200deg, #1a1d24, #1f2229)' }}
+          animate={{ x: [0, -20, 15, 0], y: [0, -15, 20, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         />
         {/* Film grain */}
         <div
-          className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay"
+          className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
             backgroundSize: '128px 128px'
