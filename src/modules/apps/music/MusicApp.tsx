@@ -2,26 +2,26 @@
 
 // ─────────────────────────────────────────────────────────────
 // Oxyx OS / Modules / Music Player
-// Hybrid: Deezer search (preview) + Spotify embed (full songs).
+// Search via Spotify API → embed Spotify track = FULL songs.
+// Also has curated Stations for browsing playlists.
 // ─────────────────────────────────────────────────────────────
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Play, Pause, SkipForward, SkipBack,
-  Volume2, VolumeX, Music, Disc3, Shuffle, Repeat,
+  Search, Play, Pause, Music, Disc3,
   Radio, Headphones, Coffee, Zap, Moon, Flame
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────
 interface Track {
-  id: number;
+  id: string;
   title: string;
   artist: string;
   album: string;
   cover: string;
   duration: number;
-  preview: string;
+  spotifyId: string;
 }
 
 interface Station {
@@ -54,96 +54,39 @@ export const MusicApp: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.7);
-  const [isMuted, setIsMuted] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [shuffleOn, setShuffleOn] = useState(false);
-  const [repeatOn, setRepeatOn] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Audio init
-  useEffect(() => {
-    const audio = new Audio();
-    audio.volume = volume;
-    audioRef.current = audio;
-    audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
-    audio.addEventListener('durationchange', () => setDuration(audio.duration));
-    return () => { audio.pause(); audio.removeAttribute('src'); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Handle track end
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onEnd = () => {
-      if (repeatOn) { audio.currentTime = 0; audio.play(); return; }
-      if (results.length > 0) {
-        const next = shuffleOn ? Math.floor(Math.random() * results.length) : (currentIndex + 1) % results.length;
-        playIdx(next);
-      } else { setIsPlaying(false); }
-    };
-    audio.addEventListener('ended', onEnd);
-    return () => audio.removeEventListener('ended', onEnd);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repeatOn, shuffleOn, currentIndex, results]);
+  const [searchError, setSearchError] = useState('');
 
   const handleSearch = async () => {
     if (!query.trim()) return;
     setIsSearching(true);
+    setSearchError('');
     try {
       const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
-      if (data.items) { setResults(data.items); setMode('search'); }
-    } catch { setResults([]); }
+      if (data.error) {
+        setSearchError(data.error);
+        setResults([]);
+      } else if (data.items) {
+        setResults(data.items);
+        setMode('search');
+      }
+    } catch {
+      setSearchError('Search failed');
+      setResults([]);
+    }
     setIsSearching(false);
   };
 
-  const playIdx = (idx: number) => {
-    const track = results[idx];
-    if (!track || !audioRef.current) return;
-    audioRef.current.src = track.preview;
-    audioRef.current.volume = isMuted ? 0 : volume;
-    audioRef.current.play();
-    setCurrentTrack(track); setCurrentIndex(idx);
-    setIsPlaying(true); setCurrentTime(0);
+  const playTrack = (track: Track) => {
+    setCurrentTrack(track);
   };
 
-  const playTrack = useCallback((track: Track) => {
-    const idx = results.findIndex(t => t.id === track.id);
-    if (idx >= 0) playIdx(idx);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, volume, isMuted]);
-
-  const togglePlay = () => {
-    if (!audioRef.current || !currentTrack) return;
-    if (isPlaying) audioRef.current.pause(); else audioRef.current.play();
-    setIsPlaying(!isPlaying);
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
   };
-
-  const handleNext = () => {
-    if (!results.length) return;
-    playIdx(shuffleOn ? Math.floor(Math.random() * results.length) : (currentIndex + 1) % results.length);
-  };
-  const handlePrev = () => {
-    if (!results.length) return;
-    if (currentTime > 3 && audioRef.current) { audioRef.current.currentTime = 0; return; }
-    playIdx(currentIndex <= 0 ? results.length - 1 : currentIndex - 1);
-  };
-
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    audioRef.current.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration;
-  };
-
-  const handleVol = (v: number) => { setVolume(v); setIsMuted(false); if (audioRef.current) audioRef.current.volume = v; };
-  const toggleMute = () => { if (audioRef.current) audioRef.current.volume = isMuted ? volume : 0; setIsMuted(!isMuted); };
-  const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
   return (
     <div className="h-full w-full bg-[#060608] flex flex-col overflow-hidden">
@@ -155,7 +98,6 @@ export const MusicApp: React.FC = () => {
           </div>
           <span className="text-[12px] font-medium text-white/45">Oxyx Music</span>
 
-          {/* Mode Toggle */}
           <div className="ml-auto flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5">
             <button onClick={() => setMode('stations')}
               className={`px-3 py-1 rounded-md text-[10px] transition-all ${mode === 'stations' ? 'bg-white/[0.08] text-white/50' : 'text-white/20 hover:text-white/30'}`}>
@@ -168,14 +110,14 @@ export const MusicApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Search Bar (always visible) */}
+        {/* Search Bar */}
         <div className="flex items-center gap-2">
           <div className="flex-1 h-8 bg-white/[0.03] border border-white/5 rounded-lg flex items-center px-3 gap-2 focus-within:border-white/15 transition-colors">
             <Search size={12} className="text-white/15 shrink-0" />
             <input type="text" value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Search songs (preview)..."
+              placeholder="Search any song on Spotify..."
               className="flex-1 bg-transparent text-[11px] text-white/50 outline-none placeholder-white/15" spellCheck={false} />
           </div>
           <button onClick={handleSearch} disabled={isSearching}
@@ -189,11 +131,10 @@ export const MusicApp: React.FC = () => {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <AnimatePresence mode="wait">
           {mode === 'stations' ? (
-            // ─── Stations Mode: Sidebar + Spotify Embed ────────
             <motion.div key="stations" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex w-full h-full">
               {/* Station List */}
               <div className="w-[200px] border-r border-white/5 overflow-y-auto py-2 px-2 shrink-0 space-y-1">
-                <p className="text-[9px] text-white/10 tracking-wider uppercase px-2 mb-2">Full Songs · Spotify</p>
+                <p className="text-[9px] text-white/10 tracking-wider uppercase px-2 mb-2">Full Songs · Playlists</p>
                 {STATIONS.map((st, i) => (
                   <motion.button key={st.id}
                     initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
@@ -203,9 +144,7 @@ export const MusicApp: React.FC = () => {
                   >
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
                       style={{ backgroundColor: activeStation.id === st.id ? st.color : 'rgba(255,255,255,0.02)' }}>
-                      <span className={activeStation.id === st.id ? 'text-white/50' : 'text-white/20 group-hover:text-white/30'}>
-                        {st.icon}
-                      </span>
+                      <span className={activeStation.id === st.id ? 'text-white/50' : 'text-white/20 group-hover:text-white/30'}>{st.icon}</span>
                     </div>
                     <div className="min-w-0">
                       <p className={`text-[11px] truncate ${activeStation.id === st.id ? 'text-white/50' : 'text-white/25 group-hover:text-white/40'}`}>{st.title}</p>
@@ -228,39 +167,47 @@ export const MusicApp: React.FC = () => {
               </div>
             </motion.div>
           ) : (
-            // ─── Search Mode: Track List + Album Art ───────────
+            // ─── Search Mode ────────────────────────────────────
             <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex w-full h-full">
               {/* Track List */}
-              <div className="w-[260px] border-r border-white/5 overflow-y-auto shrink-0">
-                {results.length === 0 ? (
+              <div className="w-[280px] border-r border-white/5 overflow-y-auto shrink-0">
+                {searchError && (
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] text-red-400/50">{searchError}</p>
+                  </div>
+                )}
+                {results.length === 0 && !searchError ? (
                   <div className="flex flex-col items-center justify-center h-full gap-3">
                     <Disc3 size={24} className="text-white/8" />
-                    <p className="text-[10px] text-white/15">Search to find songs</p>
-                    <p className="text-[8px] text-white/8">30s preview · Switch to Stations for full</p>
+                    <p className="text-[10px] text-white/15">Search any song</p>
+                    <p className="text-[8px] text-white/8">Powered by Spotify · Full songs</p>
                   </div>
                 ) : (
                   <div className="py-2 px-2 space-y-0.5">
-                    <p className="text-[9px] text-white/10 tracking-wider uppercase px-2 mb-1">Preview · 30s clips</p>
+                    <p className="text-[9px] text-white/10 tracking-wider uppercase px-2 mb-1">Results · {results.length} tracks</p>
                     {results.map((track, i) => (
                       <motion.div key={track.id}
                         initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.015 }}
                         onClick={() => playTrack(track)}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group transition-all
+                        className={`flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer group transition-all
                           ${currentTrack?.id === track.id ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'}`}
                       >
-                        <div className="relative w-8 h-8 rounded-md overflow-hidden shrink-0 bg-white/5">
+                        <div className="relative w-9 h-9 rounded-md overflow-hidden shrink-0 bg-white/5">
                           {track.cover && <img src={track.cover} alt="" className="w-full h-full object-cover" />}
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            {currentTrack?.id === track.id && isPlaying
-                              ? <Pause size={10} className="text-white/80" />
-                              : <Play size={10} className="text-white/80 ml-0.5" />}
+                            {currentTrack?.id === track.id
+                              ? <Pause size={11} className="text-white/80" />
+                              : <Play size={11} className="text-white/80 ml-0.5" />}
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-[10px] truncate ${currentTrack?.id === track.id ? 'text-white/55' : 'text-white/30 group-hover:text-white/45'}`}>{track.title}</p>
-                          <p className="text-[8px] text-white/12 truncate">{track.artist}</p>
+                          <p className={`text-[11px] truncate leading-tight ${currentTrack?.id === track.id ? 'text-white/60' : 'text-white/35 group-hover:text-white/50'}`}>
+                            {track.title}
+                          </p>
+                          <p className="text-[9px] text-white/15 truncate">{track.artist}</p>
                         </div>
-                        {currentTrack?.id === track.id && isPlaying && (
+                        <span className="text-[9px] text-white/12 font-mono shrink-0">{fmt(track.duration)}</span>
+                        {currentTrack?.id === track.id && (
                           <div className="flex items-center gap-[2px] shrink-0">
                             {[1, 2, 3].map((j) => (
                               <motion.div key={j} className="w-[2px] bg-white/30 rounded-full"
@@ -275,90 +222,33 @@ export const MusicApp: React.FC = () => {
                 )}
               </div>
 
-              {/* Now Playing */}
-              <div className="flex-1 flex flex-col items-center justify-center">
-                <AnimatePresence mode="wait">
-                  {currentTrack ? (
-                    <motion.div key={currentTrack.id}
-                      initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                      className="flex flex-col items-center gap-5"
-                    >
-                      <img src={currentTrack.cover} alt={currentTrack.album}
-                        className="w-44 h-44 rounded-2xl object-cover shadow-2xl shadow-black/60" />
-                      <div className="text-center max-w-[220px]">
-                        <p className="text-[14px] text-white/50 font-medium truncate">{currentTrack.title}</p>
-                        <p className="text-[11px] text-white/20 mt-1 truncate">{currentTrack.artist}</p>
-                        <p className="text-[9px] text-white/8 mt-0.5 truncate">{currentTrack.album}</p>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                        <Music size={18} className="text-white/10" />
-                      </div>
-                      <p className="text-[11px] text-white/15">Select a track</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              {/* Spotify Track Embed - FULL SONG */}
+              <div className="flex-1 flex flex-col">
+                {currentTrack ? (
+                  <div className="flex-1 p-3">
+                    <iframe
+                      key={currentTrack.spotifyId}
+                      src={`https://open.spotify.com/embed/track/${currentTrack.spotifyId}?utm_source=generator&theme=0`}
+                      width="100%" height="100%" frameBorder="0"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy" className="rounded-xl"
+                      title={`${currentTrack.title} - ${currentTrack.artist}`}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center">
+                      <Music size={18} className="text-white/10" />
+                    </div>
+                    <p className="text-[11px] text-white/15">Select a track to play</p>
+                    <p className="text-[9px] text-white/8">Full songs via Spotify</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-
-      {/* Bottom Player (Search mode only) */}
-      {mode === 'search' && (
-        <div className="border-t border-white/5 bg-[#08080a] shrink-0">
-          {/* Progress */}
-          <div className="px-5 pt-2.5 pb-0.5">
-            <div className="flex items-center gap-3">
-              <span className="text-[9px] text-white/15 font-mono w-7 text-right">{fmt(currentTime)}</span>
-              <div className="flex-1 h-[3px] bg-white/[0.06] rounded-full cursor-pointer group" onClick={handleSeek}>
-                <div className="h-full bg-white/20 rounded-full relative" style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </div>
-              <span className="text-[9px] text-white/15 font-mono w-7">{fmt(duration || 30)}</span>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center justify-between px-5 py-2">
-            <div className="flex items-center gap-2.5 w-[180px]">
-              {currentTrack ? (
-                <>
-                  <img src={currentTrack.cover} alt="" className="w-9 h-9 rounded-md object-cover" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] text-white/40 truncate">{currentTrack.title}</p>
-                    <p className="text-[8px] text-white/15 truncate">{currentTrack.artist}</p>
-                  </div>
-                </>
-              ) : <p className="text-[9px] text-white/12">No track</p>}
-            </div>
-
-            <div className="flex items-center gap-3.5">
-              <button onClick={() => setShuffleOn(!shuffleOn)} className={shuffleOn ? 'text-white/45' : 'text-white/12 hover:text-white/25'}><Shuffle size={13} /></button>
-              <button onClick={handlePrev} className="text-white/20 hover:text-white/45"><SkipBack size={16} /></button>
-              <button onClick={togglePlay} className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center text-white/55 hover:text-white/75 transition-all">
-                {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
-              </button>
-              <button onClick={handleNext} className="text-white/20 hover:text-white/45"><SkipForward size={16} /></button>
-              <button onClick={() => setRepeatOn(!repeatOn)} className={repeatOn ? 'text-white/45' : 'text-white/12 hover:text-white/25'}><Repeat size={13} /></button>
-            </div>
-
-            <div className="flex items-center gap-2 w-[180px] justify-end">
-              <button onClick={toggleMute} className="text-white/15 hover:text-white/35">
-                {isMuted || volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
-              </button>
-              <input type="range" min="0" max="1" step="0.01" value={isMuted ? 0 : volume}
-                onChange={(e) => handleVol(Number(e.target.value))}
-                className="w-16 h-1 appearance-none bg-white/10 rounded-full cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5
-                  [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white/50" />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
