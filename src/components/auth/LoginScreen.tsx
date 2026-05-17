@@ -2,55 +2,93 @@
 
 // ─────────────────────────────────────────────────────────────
 // Oxyx OS / Auth / Login Screen
-// Premium login/register UI with boot-style animations.
+// Locked down — registration disabled. Only existing accounts
+// can access the system. Owner account is protected.
 // ─────────────────────────────────────────────────────────────
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Lock, Mail, User, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { syncUserProfile, logSystemEvent } from '@/lib/firestore';
+import { Lock, Mail, AlertCircle, ArrowRight, Eye, EyeOff, Shield } from 'lucide-react';
+
+// Max login attempts before temporary lockout
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export const LoginScreen: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+
+  const isLocked = lockedUntil && Date.now() < lockedUntil;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Check lockout
+    if (isLocked) {
+      const remaining = Math.ceil(((lockedUntil || 0) - Date.now()) / 60000);
+      setError(`System locked. Try again in ${remaining} minute(s).`);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+
+      // Sync user profile to Firestore on successful login
+      await syncUserProfile(
+        cred.user.uid,
+        cred.user.email || '',
+        cred.user.displayName || ''
+      );
+
+      // Log successful login
+      await logSystemEvent('login_success', {
+        uid: cred.user.uid,
+        email: cred.user.email,
+      });
+
+      // Reset attempts on success
+      setAttempts(0);
+      setLockedUntil(null);
+    } catch (err: unknown) {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+
+      // Log failed attempt
+      await logSystemEvent('login_failed', {
+        email,
+        attempt: newAttempts,
+      });
+
+      // Lockout after max attempts
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const lockUntil = Date.now() + LOCKOUT_DURATION_MS;
+        setLockedUntil(lockUntil);
+        setError(`Too many failed attempts. System locked for 5 minutes.`);
+
+        await logSystemEvent('account_lockout', {
+          email,
+          lockUntil: new Date(lockUntil).toISOString(),
+        });
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        if (displayName.trim()) {
-          await updateProfile(cred.user, { displayName: displayName.trim() });
+        const code = (err as { code?: string })?.code || '';
+        // Intentionally vague error messages to prevent enumeration
+        if (code === 'auth/too-many-requests') {
+          setError('Too many attempts. Try again later.');
+        } else {
+          setError(`Access denied. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
         }
       }
-    } catch (err: unknown) {
-      const code = (err as { code?: string })?.code || '';
-      const messages: Record<string, string> = {
-        'auth/invalid-email': 'Invalid email address',
-        'auth/user-disabled': 'Account has been disabled',
-        'auth/user-not-found': 'No account found with this email',
-        'auth/wrong-password': 'Incorrect password',
-        'auth/email-already-in-use': 'Email already registered',
-        'auth/weak-password': 'Password must be at least 6 characters',
-        'auth/too-many-requests': 'Too many attempts. Try again later.',
-        'auth/invalid-credential': 'Invalid email or password',
-      };
-      setError(messages[code] || 'Authentication failed');
     }
     setLoading(false);
   };
@@ -116,7 +154,7 @@ export const LoginScreen: React.FC = () => {
             transition={{ delay: 0.4 }}
             className="text-[10px] tracking-[0.2em] text-white/15 uppercase mt-1"
           >
-            {isLogin ? 'System Authentication' : 'Create Account'}
+            System Authentication
           </motion.p>
         </div>
 
@@ -128,26 +166,6 @@ export const LoginScreen: React.FC = () => {
           onSubmit={handleSubmit}
           className="space-y-3"
         >
-          {/* Display Name (Register only) */}
-          {!isLogin && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-            >
-              <div className="flex items-center gap-3 h-11 px-4 bg-white/[0.03] border border-white/[0.06] rounded-xl focus-within:border-white/15 transition-colors">
-                <User size={14} className="text-white/15 shrink-0" />
-                <input
-                  type="text" value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Display name"
-                  className="flex-1 bg-transparent text-[12px] text-white/60 outline-none placeholder-white/15"
-                  spellCheck={false}
-                />
-              </div>
-            </motion.div>
-          )}
-
           {/* Email */}
           <div className="flex items-center gap-3 h-11 px-4 bg-white/[0.03] border border-white/[0.06] rounded-xl focus-within:border-white/15 transition-colors">
             <Mail size={14} className="text-white/15 shrink-0" />
@@ -157,6 +175,7 @@ export const LoginScreen: React.FC = () => {
               placeholder="Email address"
               className="flex-1 bg-transparent text-[12px] text-white/60 outline-none placeholder-white/15"
               required spellCheck={false} autoComplete="email"
+              disabled={!!isLocked}
             />
           </div>
 
@@ -168,7 +187,8 @@ export const LoginScreen: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               className="flex-1 bg-transparent text-[12px] text-white/60 outline-none placeholder-white/15"
-              required autoComplete={isLogin ? 'current-password' : 'new-password'}
+              required autoComplete="current-password"
+              disabled={!!isLocked}
             />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-white/15 hover:text-white/30 transition-colors">
               {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -187,9 +207,23 @@ export const LoginScreen: React.FC = () => {
             </motion.div>
           )}
 
+          {/* Attempt counter */}
+          {attempts > 0 && attempts < MAX_ATTEMPTS && !isLocked && (
+            <div className="flex items-center justify-center gap-1.5">
+              {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    i < attempts ? 'bg-red-400/40' : 'bg-white/[0.06]'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
           {/* Submit */}
           <button
-            type="submit" disabled={loading}
+            type="submit" disabled={loading || !!isLocked}
             className="w-full h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] hover:border-white/15
               text-[12px] text-white/50 hover:text-white/70 tracking-wider uppercase transition-all duration-300
               flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -197,39 +231,29 @@ export const LoginScreen: React.FC = () => {
             {loading ? (
               <motion.div className="w-4 h-4 border border-white/20 border-t-white/50 rounded-full"
                 animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+            ) : isLocked ? (
+              <>
+                <Shield size={14} className="text-red-400/40" />
+                System Locked
+              </>
             ) : (
               <>
-                {isLogin ? 'Access System' : 'Create Account'}
+                Access System
                 <ArrowRight size={14} className="text-white/30" />
               </>
             )}
           </button>
         </motion.form>
 
-        {/* Toggle Login/Register */}
+        {/* Security badge — NO register button */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="text-center mt-6"
-        >
-          <button
-            onClick={() => { setIsLogin(!isLogin); setError(''); }}
-            className="text-[10px] text-white/15 hover:text-white/30 transition-colors tracking-wider"
-          >
-            {isLogin ? 'No account? Create one' : 'Already have an account? Sign in'}
-          </button>
-        </motion.div>
-
-        {/* Security badge */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="flex items-center justify-center gap-1.5 mt-6"
+          className="flex items-center justify-center gap-1.5 mt-8"
         >
           <Lock size={8} className="text-white/8" />
-          <span className="text-[8px] text-white/8 tracking-wider">ENCRYPTED · FIREBASE AUTH</span>
+          <span className="text-[8px] text-white/8 tracking-wider">RESTRICTED ACCESS · AUTHORIZED PERSONNEL ONLY</span>
         </motion.div>
       </motion.div>
     </div>

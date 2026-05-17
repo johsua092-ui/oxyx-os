@@ -1,11 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // Oxyx OS / Modules / Oxyx AI / Hook
-// Custom hook for sending messages and handling AI responses.
+// Custom hook for sending messages, handling AI responses,
+// and persisting chat history to Firestore.
 // ─────────────────────────────────────────────────────────────
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useOxyxAIStore } from '../store/oxyxAIStore';
 import { auth } from '@/lib/firebase';
+import { saveConversation, getConversationMessages, StoredMessage } from '@/lib/firestore';
 
 export function useOxyxAI() {
   const {
@@ -19,6 +21,70 @@ export function useOxyxAI() {
     setProcessing,
     setError,
   } = useOxyxAIStore();
+
+  // Conversation ID — persists across messages in one session
+  const conversationId = useRef<string>(`conv-${Date.now()}`);
+
+  // Auto-save to Firestore after each assistant response
+  const saveToFirestore = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user || messages.length < 2) return;
+
+    const storedMessages: StoredMessage[] = messages
+      .filter(m => !m.isLoading)
+      .map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        hasImage: !!m.imagePreview,
+      }));
+
+    // Title = first user message (truncated)
+    const firstUserMsg = messages.find(m => m.role === 'user');
+    const title = firstUserMsg
+      ? firstUserMsg.content.substring(0, 80) || 'Image Analysis'
+      : 'Untitled';
+
+    try {
+      await saveConversation(user.uid, conversationId.current, storedMessages, title);
+    } catch {
+      // Silent fail — don't break chat if Firestore save fails
+    }
+  }, [messages]);
+
+  // Save after assistant responds (messages updated)
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg?.role === 'assistant' && !lastMsg.isLoading) {
+      saveToFirestore();
+    }
+  }, [messages, saveToFirestore]);
+
+  // Load conversation from Firestore
+  const loadConversation = useCallback(async (convId: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const storedMessages = await getConversationMessages(user.uid, convId);
+      if (storedMessages.length > 0) {
+        // Clear current chat and load stored messages
+        const store = useOxyxAIStore.getState();
+        store.clearChat();
+        conversationId.current = convId;
+
+        storedMessages.forEach(m => {
+          if (m.role === 'user') {
+            store.addUserMessage(m.content);
+          } else {
+            store.addAssistantMessage(`loaded-${m.timestamp}`, m.content);
+          }
+        });
+      }
+    } catch {
+      // Silent fail
+    }
+  }, []);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() && !pendingImage) return;
@@ -100,5 +166,7 @@ export function useOxyxAI() {
     isProcessing,
     error,
     sendMessage,
+    loadConversation,
+    conversationId: conversationId.current,
   };
 }
