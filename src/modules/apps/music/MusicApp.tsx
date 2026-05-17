@@ -12,6 +12,7 @@ import {
   Search, Play, Pause, Music, Disc3,
   Radio, Headphones, Coffee, Zap, Moon, Flame, Clock
 } from 'lucide-react';
+import { auth } from '@/lib/firebase';
 
 // ─── Types ──────────────────────────────────────────────────
 interface Track {
@@ -60,7 +61,10 @@ export const MusicApp: React.FC = () => {
     setIsSearching(true);
     setSearchError('');
     try {
-      const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
       const data = await res.json();
       if (data.error) { setSearchError(data.error); setResults([]); }
       else if (data.items) { setResults(data.items); setMode('search'); }

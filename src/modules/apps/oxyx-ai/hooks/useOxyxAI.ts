@@ -5,6 +5,7 @@
 
 import { useCallback } from 'react';
 import { useOxyxAIStore } from '../store/oxyxAIStore';
+import { auth } from '@/lib/firebase';
 
 export function useOxyxAI() {
   const {
@@ -57,9 +58,15 @@ export function useOxyxAI() {
         },
       ];
 
+      // Get Firebase auth token
+      const token = await auth.currentUser?.getIdToken();
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
         body: JSON.stringify({ messages: apiMessages }),
       });
 

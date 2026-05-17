@@ -1,19 +1,24 @@
 // ─────────────────────────────────────────────────────────────
 // Oxyx OS / API / Music Search
-// Strategy: Deezer for metadata (album art, artist) +
-//           YouTube search for video IDs (full playback).
+// Auth-protected YouTube search for full song playback.
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server';
 import YouTube from 'youtube-sr';
-import { rateLimit } from '@/lib/api-security';
+import { requireAuth, rateLimit, safeError } from '@/lib/api-security';
 
 export async function GET(request: NextRequest) {
-  // Rate limit: 30 requests per minute
-  const ip = request.headers.get('x-forwarded-for') || 'unknown';
-  const { allowed } = rateLimit(ip, 30);
-  if (!allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+  // ─── Auth Check ─────────────────────────────────────────
+  const { auth, error: authError } = requireAuth(request);
+  if (authError) return authError;
+
+  // ─── Rate Limit (owner bypasses) ────────────────────────
+  if (!auth.isOwner) {
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
+    const { allowed } = rateLimit(ip, 30);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
   }
 
   const query = request.nextUrl.searchParams.get('q');
@@ -23,7 +28,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Search YouTube for full songs
     const videos = await YouTube.search(`${query} audio`, {
       limit: 15,
       type: 'video',
@@ -44,7 +48,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Search failed';
-    return NextResponse.json({ error: msg, items: [] }, { status: 500 });
+    return NextResponse.json({ error: safeError(error), items: [] }, { status: 500 });
   }
 }

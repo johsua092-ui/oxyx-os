@@ -101,7 +101,7 @@ export class AIRouter {
     const maxTotalAttempts = this.providerOrder.length * 3; // 3 retries per provider
 
     if (attempt >= maxTotalAttempts) {
-      throw new Error('All AI providers and keys exhausted. Please try again later.');
+      throw new Error('Service temporarily unavailable. Please try again later.');
     }
 
     const provider = this.activeProvider;
@@ -111,9 +111,13 @@ export class AIRouter {
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(
-        `[AIRouter] Provider ${provider.config.id} failed (key ${provider.config.currentKeyIndex + 1}/${provider.config.keys.length}): ${errorMessage}`
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(
+          `[AIRouter] Provider ${provider.config.id} failed (key ${provider.config.currentKeyIndex + 1}/${provider.config.keys.length}): ${errorMessage}`
+        );
+      } else {
+        console.error('[AIRouter] Provider failed, attempting fallback...');
+      }
 
       if (errorMessage.includes('RATE_LIMITED')) {
         // Try rotating key within the same provider
@@ -122,7 +126,7 @@ export class AIRouter {
           // All keys for this provider exhausted, switch provider
           const switched = this.switchToNextProvider();
           if (!switched) {
-            throw new Error('All AI providers and keys exhausted. Please try again later.');
+            throw new Error('Service temporarily unavailable. Please try again later.');
           }
         }
         return this.executeWithFallback(method, payload, attempt + 1);
