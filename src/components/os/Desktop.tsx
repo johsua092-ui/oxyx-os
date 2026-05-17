@@ -110,68 +110,75 @@ export const Desktop: React.FC = () => {
     <div className="relative w-full h-full overflow-hidden bg-black selection:bg-white/20 text-white/80">
       {/* Dynamic Wallpaper */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(20,20,35,0.8),rgba(0,0,0,1))]" />
+        {/* Base gradient - deep blue tint */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(15,23,42,0.9),rgba(0,0,0,1))]" />
         
-        {/* Subtle grid pattern */}
+        {/* Grid pattern - visible */}
         <div 
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0"
           style={{
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
+              linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)
             `,
-            backgroundSize: '60px 60px',
+            backgroundSize: '50px 50px',
           }}
         />
 
-        {/* Animated aurora blobs */}
+        {/* Horizon glow line */}
+        <div className="absolute top-[35%] left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+        <div className="absolute top-[35%] left-[20%] right-[20%] h-[80px] bg-gradient-to-b from-blue-500/[0.04] to-transparent blur-[40px]" />
+
+        {/* Animated aurora blobs - brighter */}
         <motion.div 
-          className="absolute w-[50vw] h-[50vw] rounded-full blur-[150px] opacity-[0.07]"
-          style={{ top: '10%', left: '20%', background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}
+          className="absolute w-[60vw] h-[60vw] rounded-full blur-[180px] opacity-[0.12]"
+          style={{ top: '5%', left: '15%', background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}
           animate={{ x: [0, 60, -30, 0], y: [0, 40, -20, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         />
         <motion.div 
-          className="absolute w-[40vw] h-[40vw] rounded-full blur-[130px] opacity-[0.05]"
-          style={{ bottom: '0%', right: '10%', background: 'linear-gradient(135deg, #8b5cf6, #a855f7)' }}
+          className="absolute w-[45vw] h-[45vw] rounded-full blur-[150px] opacity-[0.08]"
+          style={{ bottom: '-5%', right: '5%', background: 'linear-gradient(135deg, #8b5cf6, #a855f7)' }}
           animate={{ x: [0, -50, 30, 0], y: [0, -30, 40, 0] }}
           transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
         />
         <motion.div 
-          className="absolute w-[30vw] h-[30vw] rounded-full blur-[100px] opacity-[0.04]"
-          style={{ top: '50%', left: '60%', background: 'linear-gradient(135deg, #06b6d4, #0ea5e9)' }}
+          className="absolute w-[35vw] h-[35vw] rounded-full blur-[120px] opacity-[0.06]"
+          style={{ top: '45%', left: '55%', background: 'linear-gradient(135deg, #06b6d4, #0ea5e9)' }}
           animate={{ x: [0, 30, -40, 0], y: [0, -50, 20, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
         />
 
-        {/* Floating micro-particles */}
-        {[...Array(12)].map((_, i) => (
+        {/* Floating particles - bigger */}
+        {[...Array(20)].map((_, i) => (
           <motion.div
             key={`particle-${i}`}
-            className="absolute w-[2px] h-[2px] rounded-full bg-white/10"
+            className="absolute rounded-full bg-white"
             style={{
-              top: `${10 + (i * 7) % 80}%`,
-              left: `${5 + (i * 13) % 90}%`,
+              width: `${1 + (i % 3)}px`,
+              height: `${1 + (i % 3)}px`,
+              top: `${8 + (i * 4.5) % 84}%`,
+              left: `${3 + (i * 5.1) % 94}%`,
             }}
             animate={{
-              y: [0, -30, 0],
-              opacity: [0.05, 0.15, 0.05],
+              y: [0, -(20 + i * 2), 0],
+              opacity: [0.03, 0.2, 0.03],
             }}
             transition={{
-              duration: 6 + (i % 4) * 2,
+              duration: 5 + (i % 5) * 1.5,
               repeat: Infinity,
               ease: 'easeInOut',
-              delay: i * 0.5,
+              delay: i * 0.3,
             }}
           />
         ))}
 
         {/* Corner vignette */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_40%,rgba(0,0,0,0.5)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_30%,rgba(0,0,0,0.6)_100%)]" />
 
         {/* Film grain */}
         <div 
-          className="absolute inset-0 opacity-[0.025] pointer-events-none mix-blend-overlay"
+          className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
           style={{ 
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
             backgroundSize: '128px 128px'
