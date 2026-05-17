@@ -149,29 +149,8 @@ export const Desktop: React.FC = () => {
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
         />
 
-        {/* Floating particles - bigger */}
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={`particle-${i}`}
-            className="absolute rounded-full bg-white"
-            style={{
-              width: `${1 + (i % 3)}px`,
-              height: `${1 + (i % 3)}px`,
-              top: `${8 + (i * 4.5) % 84}%`,
-              left: `${3 + (i * 5.1) % 94}%`,
-            }}
-            animate={{
-              y: [0, -(20 + i * 2), 0],
-              opacity: [0.03, 0.2, 0.03],
-            }}
-            transition={{
-              duration: 5 + (i % 5) * 1.5,
-              repeat: Infinity,
-              ease: 'easeInOut',
-              delay: i * 0.3,
-            }}
-          />
-        ))}
+
+
 
         {/* Corner vignette */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_30%,rgba(0,0,0,0.6)_100%)]" />
