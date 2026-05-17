@@ -5,7 +5,10 @@ import { Taskbar } from './Taskbar';
 import { WindowManager } from './WindowManager';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
-import { Shield, Cpu, Wifi, Activity } from 'lucide-react';
+import { Shield, Cpu, Wifi, Activity, LogOut } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 // ─── Clock Widget ───────────────────────────────────────────
 const ClockWidget: React.FC = () => {
@@ -82,7 +85,10 @@ const SystemWidget: React.FC = () => {
 // ─── Desktop Component ──────────────────────────────────────
 export const Desktop: React.FC = () => {
   const { isBooting, completeBoot } = useOSStore();
+  const { user } = useAuth();
   const [bootPhase, setBootPhase] = useState(0);
+
+  const handleLogout = () => signOut(auth);
 
   useEffect(() => {
     if (!isBooting) return;
@@ -230,7 +236,7 @@ export const Desktop: React.FC = () => {
           </motion.div>
         </div>
 
-        {/* Welcome Text - Left Side */}
+        {/* Welcome Text + Logout */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -238,10 +244,19 @@ export const Desktop: React.FC = () => {
           className="absolute top-10 left-10 z-[5]"
         >
           <p className="text-[11px] text-white/10 tracking-[0.3em] uppercase mb-2">Welcome back</p>
-          <h1 className="text-[28px] font-extralight text-white/30 tracking-wide">Oxyx OS</h1>
+          <h1 className="text-[28px] font-extralight text-white/30 tracking-wide">
+            {user?.displayName || user?.email?.split('@')[0] || 'User'}
+          </h1>
           <p className="text-[11px] text-white/10 mt-1 max-w-[200px] leading-relaxed">
             Your workspace is ready. All systems operational.
           </p>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/10 transition-all group"
+          >
+            <LogOut size={10} className="text-white/15 group-hover:text-white/30" />
+            <span className="text-[9px] text-white/15 group-hover:text-white/30 tracking-wider">Sign Out</span>
+          </button>
         </motion.div>
 
         <WindowManager />
