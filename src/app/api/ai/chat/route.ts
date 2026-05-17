@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAIRouter } from '@/core/engine/ai/ai-router';
 import { AIMessage } from '@/core/engine/ai/types';
+import { rateLimit } from '@/lib/api-security';
 
 const OXYX_SYSTEM_PROMPT = `You are Oxyx AI, an advanced intelligence system embedded within Oxyx OS. You are designed for cybersecurity reconnaissance, vulnerability analysis, bug bounty hunting, and general-purpose intelligence work.
 
@@ -24,6 +25,13 @@ When you don't have enough information, ask precise clarifying questions rather 
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 20 requests per minute per IP
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
+    const { allowed } = rateLimit(ip, 20);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
+    }
+
     const body = await request.json() as {
       messages?: AIMessage[];
       temperature?: number;

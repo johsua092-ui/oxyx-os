@@ -6,8 +6,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import YouTube from 'youtube-sr';
+import { rateLimit } from '@/lib/api-security';
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 30 requests per minute
+  const ip = request.headers.get('x-forwarded-for') || 'unknown';
+  const { allowed } = rateLimit(ip, 30);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+  }
+
   const query = request.nextUrl.searchParams.get('q');
 
   if (!query) {
