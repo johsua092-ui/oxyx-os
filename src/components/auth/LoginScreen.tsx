@@ -98,16 +98,16 @@ export const LoginScreen: React.FC = () => {
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black selection:bg-white/20">
       {/* Background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(20,20,35,0.8),rgba(0,0,0,1))]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a1628] via-[#0c1220] to-[#050a12]" />
         <motion.div
-          className="absolute w-[50vw] h-[50vw] rounded-full blur-[150px] opacity-[0.06]"
-          style={{ top: '20%', left: '30%', background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}
+          className="absolute w-[55vw] h-[55vw] rounded-full blur-[160px]"
+          style={{ top: '10%', left: '20%', background: 'linear-gradient(135deg, #1e3a5f, #1a4a6e)' }}
           animate={{ x: [0, 40, -20, 0], y: [0, 30, -15, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
         />
         <motion.div
-          className="absolute w-[35vw] h-[35vw] rounded-full blur-[120px] opacity-[0.04]"
-          style={{ bottom: '10%', right: '20%', background: 'linear-gradient(135deg, #8b5cf6, #a855f7)' }}
+          className="absolute w-[40vw] h-[40vw] rounded-full blur-[140px]"
+          style={{ bottom: '5%', right: '10%', background: 'linear-gradient(200deg, #0d4f5c, #0a3d4a)' }}
           animate={{ x: [0, -30, 20, 0], y: [0, -20, 30, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         />
