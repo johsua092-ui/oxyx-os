@@ -39,8 +39,8 @@ export const SystemMonitorApp: React.FC = () => {
           }
         });
         const json = await res.json();
-        if (json.success) {
-          setAiStatus(json.data);
+        if (json.success && json.data?.providers) {
+          setAiStatus(json.data.providers);
         }
       } catch (err) {
         console.error('Failed to fetch AI status:', err);
