@@ -30,12 +30,12 @@ const ClockWidget: React.FC = () => {
   return (
     <div className="text-right">
       <div className="flex items-baseline gap-1 justify-end">
-        <span className="text-[48px] font-extralight text-white/80 tracking-tight leading-none">{hours}</span>
-        <span className="text-[48px] font-extralight text-white/30 tracking-tight leading-none animate-pulse">:</span>
-        <span className="text-[48px] font-extralight text-white/80 tracking-tight leading-none">{minutes}</span>
-        <span className="text-[20px] font-light text-white/30 tracking-tight leading-none ml-1">{seconds}</span>
+        <span className="text-[48px] font-extralight text-white/90 tracking-tight leading-none">{hours}</span>
+        <span className="text-[48px] font-extralight text-white/40 tracking-tight leading-none animate-pulse">:</span>
+        <span className="text-[48px] font-extralight text-white/90 tracking-tight leading-none">{minutes}</span>
+        <span className="text-[20px] font-light text-white/40 tracking-tight leading-none ml-1">{seconds}</span>
       </div>
-      <p className="text-[12px] text-white/35 tracking-wider mt-2 uppercase">{dateStr}</p>
+      <p className="text-[12px] text-white/50 tracking-wider mt-2 uppercase">{dateStr}</p>
     </div>
   );
 };
@@ -57,10 +57,10 @@ const SystemWidget: React.FC = () => {
   };
 
   const stats = [
-    { icon: Shield, label: 'Security', value: 'Active', color: 'text-emerald-400/70' },
-    { icon: Cpu, label: 'AI Engine', value: 'Online', color: 'text-sky-400/70' },
-    { icon: Wifi, label: 'Network', value: 'Connected', color: 'text-teal-400/70' },
-    { icon: Activity, label: 'Uptime', value: formatUptime(uptime), color: 'text-amber-400/70' },
+    { icon: Shield, label: 'Security', value: 'Active', color: 'text-white/50' },
+    { icon: Cpu, label: 'AI Engine', value: 'Online', color: 'text-white/50' },
+    { icon: Wifi, label: 'Network', value: 'Connected', color: 'text-white/50' },
+    { icon: Activity, label: 'Uptime', value: formatUptime(uptime), color: 'text-white/50' },
   ];
 
   return (
@@ -71,11 +71,11 @@ const SystemWidget: React.FC = () => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 1 + i * 0.1 }}
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08]"
         >
           <Icon size={14} strokeWidth={1.5} className={color} />
-          <span className="text-[11px] text-white/50 flex-1">{label}</span>
-          <span className="text-[11px] text-white/60 font-mono">{value}</span>
+          <span className="text-[11px] text-white/70 flex-1">{label}</span>
+          <span className="text-[11px] text-white/80 font-mono">{value}</span>
         </motion.div>
       ))}
     </div>
@@ -252,19 +252,19 @@ export const Desktop: React.FC = () => {
           transition={{ delay: 1.2 }}
           className="absolute top-10 left-10 z-[5]"
         >
-          <p className="text-[11px] text-white/30 tracking-[0.3em] uppercase mb-2">Welcome back</p>
-          <h1 className="text-[28px] font-extralight text-white/70 tracking-wide">
+          <p className="text-[11px] text-white/50 tracking-[0.3em] uppercase mb-2">Welcome back</p>
+          <h1 className="text-[28px] font-extralight text-white/90 tracking-wide">
             {user?.displayName || user?.email?.split('@')[0] || 'User'}
           </h1>
-          <p className="text-[11px] text-white/30 mt-1 max-w-[200px] leading-relaxed">
+          <p className="text-[11px] text-white/50 mt-1 max-w-[200px] leading-relaxed">
             Your workspace is ready. All systems operational.
           </p>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/15 transition-all group"
+            className="flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] hover:border-white/20 transition-all group"
           >
-            <LogOut size={10} className="text-white/30 group-hover:text-white/50" />
-            <span className="text-[9px] text-white/30 group-hover:text-white/50 tracking-wider">Sign Out</span>
+            <LogOut size={10} className="text-white/50 group-hover:text-white/70" />
+            <span className="text-[9px] text-white/50 group-hover:text-white/70 tracking-wider">Sign Out</span>
           </button>
         </motion.div>
 
