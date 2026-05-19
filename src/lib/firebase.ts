@@ -16,11 +16,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase (Singleton pattern to prevent re-initialization)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase safely
+let app;
+let db: any;
+let auth: any;
 
-// Initialize Services
-const db = getFirestore(app);
-const auth = getAuth(app);
+try {
+  if (firebaseConfig.apiKey) {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    auth = getAuth(app);
+  } else {
+    console.error('Firebase config is missing API key. Check Environment Variables.');
+  }
+} catch (error) {
+  console.error('Error initializing Firebase:', error);
+}
 
 export { app, db, auth };
