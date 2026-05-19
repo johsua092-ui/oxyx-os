@@ -1,8 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // Oxyx OS / Core Engine / AI Router
-// Intelligent request router with automatic provider failover.
-// When a provider hits rate limits, the router automatically
-// rotates keys and falls back to the next provider in the chain.
+// Intelligent request router with round-robin key rotation
+// and automatic provider failover.
+//
+// Key stacking: supports unlimited API keys per provider.
+// Each key is tracked independently for cooldown.
+// When one key hits rate limit → rotate to next key.
+// When ALL keys for a provider are on cooldown → fallback.
 //
 // Priority chain: Gemini (primary) → Groq (fallback)
 // ─────────────────────────────────────────────────────────────
@@ -11,10 +15,20 @@ import { AIProviderInterface, AIRequestPayload, AIResponsePayload, AIProviderID 
 import { GeminiProvider } from './providers/gemini.provider';
 import { GroqProvider } from './providers/groq.provider';
 
+// Track cooldown per key
+interface KeyStatus {
+  key: string;
+  cooldownUntil: number; // timestamp when key becomes available again
+  failCount: number;
+}
+
 export class AIRouter {
   private providers: Map<AIProviderID, AIProviderInterface> = new Map();
   private providerOrder: AIProviderID[] = ['gemini', 'groq'];
   private currentProviderIndex: number = 0;
+
+  // Track key health per provider
+  private keyStatus: Map<AIProviderID, KeyStatus[]> = new Map();
 
   constructor() {
     // Collect all keys from environment variables
@@ -23,9 +37,19 @@ export class AIRouter {
 
     if (geminiKeys.length > 0) {
       this.providers.set('gemini', new GeminiProvider(geminiKeys));
+      this.keyStatus.set('gemini', geminiKeys.map(k => ({
+        key: k,
+        cooldownUntil: 0,
+        failCount: 0,
+      })));
     }
     if (groqKeys.length > 0) {
       this.providers.set('groq', new GroqProvider(groqKeys));
+      this.keyStatus.set('groq', groqKeys.map(k => ({
+        key: k,
+        cooldownUntil: 0,
+        failCount: 0,
+      })));
     }
 
     // Filter providerOrder to only include initialized providers
@@ -38,8 +62,8 @@ export class AIRouter {
 
   private collectKeys(prefix: string): string[] {
     const keys: string[] = [];
-    // Support up to 20 stacked keys per provider
-    for (let i = 1; i <= 20; i++) {
+    // Support up to 50 stacked keys per provider
+    for (let i = 1; i <= 50; i++) {
       const key = process.env[`${prefix}_${i}`];
       if (key) {
         keys.push(key);
@@ -53,18 +77,77 @@ export class AIRouter {
     return this.providers.get(id)!;
   }
 
-  private switchToNextProvider(): boolean {
-    const nextIndex = this.currentProviderIndex + 1;
-    if (nextIndex >= this.providerOrder.length) {
-      // All providers exhausted - reset all and start over
-      this.currentProviderIndex = 0;
-      for (const provider of this.providers.values()) {
-        provider.config.currentKeyIndex = 0;
-      }
-      return false;
+  private get activeProviderId(): AIProviderID {
+    return this.providerOrder[this.currentProviderIndex];
+  }
+
+  // Find the best available key for the current provider
+  private selectBestKey(): boolean {
+    const providerId = this.activeProviderId;
+    const statuses = this.keyStatus.get(providerId);
+    if (!statuses) return false;
+
+    const now = Date.now();
+
+    // Find first key that's NOT on cooldown
+    const availableIndex = statuses.findIndex(s => s.cooldownUntil <= now);
+    if (availableIndex === -1) {
+      return false; // All keys on cooldown
     }
-    this.currentProviderIndex = nextIndex;
+
+    // Set the provider to use this key
+    this.activeProvider.config.currentKeyIndex = availableIndex;
     return true;
+  }
+
+  // Mark current key as rate-limited with exponential cooldown
+  private markKeyRateLimited(): void {
+    const providerId = this.activeProviderId;
+    const statuses = this.keyStatus.get(providerId);
+    if (!statuses) return;
+
+    const keyIndex = this.activeProvider.config.currentKeyIndex;
+    const status = statuses[keyIndex];
+
+    status.failCount += 1;
+    // Exponential backoff: 30s, 60s, 120s, 240s, max 5min
+    const cooldownMs = Math.min(30000 * Math.pow(2, status.failCount - 1), 300000);
+    status.cooldownUntil = Date.now() + cooldownMs;
+  }
+
+  // Reset a key's cooldown on successful use
+  private markKeySuccess(): void {
+    const providerId = this.activeProviderId;
+    const statuses = this.keyStatus.get(providerId);
+    if (!statuses) return;
+
+    const keyIndex = this.activeProvider.config.currentKeyIndex;
+    statuses[keyIndex].failCount = 0;
+    statuses[keyIndex].cooldownUntil = 0;
+  }
+
+  private switchToNextProvider(): boolean {
+    const startIndex = this.currentProviderIndex;
+    let nextIndex = (this.currentProviderIndex + 1) % this.providerOrder.length;
+
+    // Try each provider
+    while (nextIndex !== startIndex) {
+      this.currentProviderIndex = nextIndex;
+      if (this.selectBestKey()) {
+        return true;
+      }
+      nextIndex = (nextIndex + 1) % this.providerOrder.length;
+    }
+
+    // All providers exhausted — force reset oldest cooldowns
+    this.currentProviderIndex = 0;
+    for (const statuses of this.keyStatus.values()) {
+      for (const s of statuses) {
+        s.cooldownUntil = 0;
+        s.failCount = 0;
+      }
+    }
+    return false;
   }
 
   async chat(payload: AIRequestPayload): Promise<AIResponsePayload> {
@@ -79,7 +162,6 @@ export class AIRouter {
     });
 
     if (visionProvider) {
-      // Temporarily set this as the starting provider
       const originalIndex = this.currentProviderIndex;
       this.currentProviderIndex = this.providerOrder.indexOf(visionProvider);
       try {
@@ -98,55 +180,76 @@ export class AIRouter {
     payload: AIRequestPayload,
     attempt: number = 0
   ): Promise<AIResponsePayload> {
-    const maxTotalAttempts = this.providerOrder.length * 3; // 3 retries per provider
+    const totalKeys = Array.from(this.keyStatus.values())
+      .reduce((sum, s) => sum + s.length, 0);
+    const maxAttempts = totalKeys * 2; // Try each key up to 2x
 
-    if (attempt >= maxTotalAttempts) {
-      throw new Error('Service temporarily unavailable. Please try again later.');
+    if (attempt >= maxAttempts) {
+      throw new Error('Service temporarily unavailable. All API keys exhausted. Please try again later.');
+    }
+
+    // Select best available key for current provider
+    if (!this.selectBestKey()) {
+      // No keys available for this provider, switch
+      const switched = this.switchToNextProvider();
+      if (!switched && attempt > 0) {
+        throw new Error('Service temporarily unavailable. Please try again later.');
+      }
     }
 
     const provider = this.activeProvider;
 
     try {
       const result = await provider[method](payload);
+      this.markKeySuccess();
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+
       if (process.env.NODE_ENV !== 'production') {
+        const providerId = this.activeProviderId;
+        const keyIndex = provider.config.currentKeyIndex + 1;
+        const totalProviderKeys = provider.config.keys.length;
         console.error(
-          `[AIRouter] Provider ${provider.config.id} failed (key ${provider.config.currentKeyIndex + 1}/${provider.config.keys.length}): ${errorMessage}`
+          `[AIRouter] ${providerId} key ${keyIndex}/${totalProviderKeys} failed: ${errorMessage}`
         );
       } else {
-        console.error('[AIRouter] Provider failed, attempting fallback...');
+        console.error('[AIRouter] Provider failed, rotating...');
       }
 
       if (errorMessage.includes('RATE_LIMITED')) {
-        // Try rotating key within the same provider
-        const rotated = provider.rotateKey();
-        if (!rotated) {
-          // All keys for this provider exhausted, switch provider
-          const switched = this.switchToNextProvider();
-          if (!switched) {
-            throw new Error('Service temporarily unavailable. Please try again later.');
-          }
+        this.markKeyRateLimited();
+
+        // Try next key in same provider
+        if (this.selectBestKey()) {
+          return this.executeWithFallback(method, payload, attempt + 1);
         }
+
+        // All keys for this provider on cooldown, switch provider
+        this.switchToNextProvider();
         return this.executeWithFallback(method, payload, attempt + 1);
       }
 
-      // For non-rate-limit errors, try the next provider
+      // For non-rate-limit errors, try the next provider directly
       this.switchToNextProvider();
       return this.executeWithFallback(method, payload, attempt + 1);
     }
   }
 
-  getStatus(): { providers: Array<{ id: string; name: string; activeKey: number; totalKeys: number }> } {
+  // Status for debugging/dashboard
+  getStatus() {
+    const now = Date.now();
     return {
       providers: this.providerOrder.map(id => {
         const p = this.providers.get(id)!;
+        const statuses = this.keyStatus.get(id) || [];
         return {
           id: p.config.id,
           name: p.config.name,
-          activeKey: p.config.currentKeyIndex + 1,
           totalKeys: p.config.keys.length,
+          activeKey: p.config.currentKeyIndex + 1,
+          keysAvailable: statuses.filter(s => s.cooldownUntil <= now).length,
+          keysOnCooldown: statuses.filter(s => s.cooldownUntil > now).length,
         };
       }),
     };
