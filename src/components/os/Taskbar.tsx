@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { useOSStore } from '@/store/osStore';
-import { Terminal, Folder, Music, Settings, Crosshair } from 'lucide-react';
+import { Terminal, Folder, Music, Settings, Crosshair, Activity } from 'lucide-react';
 import { AppID, AppConfig } from '@/types/os';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
 export const APPS: Record<AppID, AppConfig> = {
   'oxyx-ai': { id: 'oxyx-ai', title: 'Oxyx AI', icon: Crosshair, defaultWidth: 900, defaultHeight: 600 },
+  'monitor': { id: 'monitor', title: 'System Monitor', icon: Activity, defaultWidth: 800, defaultHeight: 500 },
   'terminal': { id: 'terminal', title: 'Terminal', icon: Terminal, defaultWidth: 700, defaultHeight: 450 },
   'explorer': { id: 'explorer', title: 'Files', icon: Folder, defaultWidth: 800, defaultHeight: 500 },
   'music': { id: 'music', title: 'Music', icon: Music, defaultWidth: 850, defaultHeight: 550 },

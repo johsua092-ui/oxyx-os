@@ -1,4 +1,4 @@
-export type AppID = 'terminal' | 'explorer' | 'music' | 'settings' | 'oxyx-ai';
+export type AppID = 'terminal' | 'explorer' | 'music' | 'settings' | 'oxyx-ai' | 'monitor';
 
 export interface AppConfig {
   id: AppID;

@@ -9,6 +9,7 @@ import { OxyxAIApp } from '@/modules/apps/oxyx-ai/components/OxyxAIApp';
 import { TerminalApp } from '@/modules/apps/terminal/TerminalApp';
 import { FileExplorerApp } from '@/modules/apps/explorer/FileExplorerApp';
 import { MusicApp } from '@/modules/apps/music/MusicApp';
+import { SystemMonitorApp } from '@/modules/apps/monitor/SystemMonitorApp';
 
 const SettingsApp = () => (
   <div className="h-full w-full bg-[#0a0a0c] p-6">
@@ -44,6 +45,7 @@ export const WindowManager: React.FC = () => {
       case 'music': return <MusicApp />;
       case 'settings': return <SettingsApp />;
       case 'oxyx-ai': return <OxyxAIApp />;
+      case 'monitor': return <SystemMonitorApp />;
       default: return <div className="p-4 text-white/30">Unknown application</div>;
     }
   };
