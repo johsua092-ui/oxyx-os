@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, Shield, Key, Server, Cpu, History } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -32,10 +32,15 @@ export const SystemMonitorApp: React.FC = () => {
   useEffect(() => {
     const fetchAIStatus = async () => {
       try {
-        const res = await fetch('/api/system/status');
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/system/status', {
+          headers: {
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          }
+        });
         const json = await res.json();
         if (json.success) {
-          setAiStatus(json.data.providers);
+          setAiStatus(json.data);
         }
       } catch (err) {
         console.error('Failed to fetch AI status:', err);

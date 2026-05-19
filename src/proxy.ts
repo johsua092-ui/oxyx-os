@@ -32,7 +32,7 @@ const CSP_DIRECTIVES = [
   "upgrade-insecure-requests",
 ].join('; ');
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const response = NextResponse.next();
   const origin = request.headers.get('origin') || '';
 
