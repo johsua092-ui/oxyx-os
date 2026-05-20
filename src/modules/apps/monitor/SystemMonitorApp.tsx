@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, Shield, Key, Server, Cpu, History } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/auth-context';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -25,15 +26,17 @@ interface LogEntry {
 }
 
 export const SystemMonitorApp: React.FC = () => {
+  const { isOwner, user } = useAuth();
   const [aiStatus, setAiStatus] = useState<ProviderStatus[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch AI Status periodically
   useEffect(() => {
+    if (!isOwner) return;
     const fetchAIStatus = async () => {
       try {
-        const token = await auth.currentUser?.getIdToken();
+        const token = await user?.getIdToken();
         const res = await fetch('/api/system/status', {
           headers: {
             ...(token && { 'Authorization': `Bearer ${token}` })
@@ -51,10 +54,14 @@ export const SystemMonitorApp: React.FC = () => {
     fetchAIStatus();
     const interval = setInterval(fetchAIStatus, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isOwner, user]);
 
   // Listen to Firestore Logs
   useEffect(() => {
+    if (!isOwner) {
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(15));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLogs = snapshot.docs.map(doc => ({
@@ -63,10 +70,25 @@ export const SystemMonitorApp: React.FC = () => {
       })) as LogEntry[];
       setLogs(fetchedLogs);
       setLoading(false);
+    }, (err) => {
+      console.error('Error fetching logs:', err);
+      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isOwner]);
+
+  if (!isOwner) {
+    return (
+      <div className="h-full w-full bg-[#0a0a0c] flex flex-col items-center justify-center font-mono text-white/40 gap-4 p-8 text-center">
+        <Shield size={40} className="text-red-500/50 animate-pulse" strokeWidth={1.5} />
+        <h2 className="text-[12px] font-bold text-red-400/70 tracking-widest uppercase">ACCESS DENIED</h2>
+        <p className="text-[11px] max-w-sm leading-relaxed text-white/30">
+          The System Dashboard contains sensitive security logs and token configuration. Only the system owner has authorization to view this panel.
+        </p>
+      </div>
+    );
+  }
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
