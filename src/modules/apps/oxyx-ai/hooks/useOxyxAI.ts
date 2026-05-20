@@ -105,15 +105,17 @@ export function useOxyxAI() {
       const hasImage = !!image;
       const endpoint = hasImage ? '/api/ai/analyze' : '/api/ai/chat';
 
+      // Filter and keep only the last 8 messages for token/rate-limit efficiency
+      const conversationHistory = messages.filter(m => !m.isLoading);
+      const trimmedHistory = conversationHistory.slice(-8);
+
       // Build the messages payload for the API
       const apiMessages = [
-        ...messages
-          .filter(m => !m.isLoading)
-          .map(m => ({
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            timestamp: m.timestamp,
-          })),
+        ...trimmedHistory.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
         {
           role: 'user' as const,
           content,
