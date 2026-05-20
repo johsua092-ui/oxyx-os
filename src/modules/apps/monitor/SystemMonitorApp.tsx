@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Activity, Shield, Key, Server, Cpu, History } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Activity, Shield, Key, Server, Cpu, History, Globe, Plus, Trash2 } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
@@ -30,6 +30,13 @@ export const SystemMonitorApp: React.FC = () => {
   const [aiStatus, setAiStatus] = useState<ProviderStatus[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // IP Whitelist state
+  const [whitelistedIPs, setWhitelistedIPs] = useState<Array<{id: string; ip: string; label: string}>>([]);
+  const [myIP, setMyIP] = useState('');
+  const [newIPInput, setNewIPInput] = useState('');
+  const [newIPLabel, setNewIPLabel] = useState('');
+  const [ipLoading, setIpLoading] = useState(false);
 
   // Fetch AI Status periodically
   useEffect(() => {
@@ -88,6 +95,59 @@ export const SystemMonitorApp: React.FC = () => {
 
     return () => unsubscribe();
   }, [isOwner]);
+
+  // Fetch IP whitelist
+  const fetchWhitelist = useCallback(async () => {
+    try {
+      const [listRes, ipRes] = await Promise.all([
+        fetch('/api/auth/check-ip?action=list'),
+        fetch('/api/auth/check-ip?action=my-ip'),
+      ]);
+      const listData = await listRes.json();
+      const ipData = await ipRes.json();
+      if (listData.success) setWhitelistedIPs(listData.ips || []);
+      if (ipData.success) setMyIP(ipData.ip || '');
+    } catch (err) {
+      console.error('Failed to fetch IP whitelist:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    fetchWhitelist();
+  }, [isOwner, fetchWhitelist]);
+
+  const handleAddIP = async () => {
+    const ip = newIPInput.trim();
+    if (!ip) return;
+    setIpLoading(true);
+    try {
+      await fetch(`/api/auth/check-ip?action=add&ip=${encodeURIComponent(ip)}&label=${encodeURIComponent(newIPLabel || 'Custom')}`);
+      setNewIPInput('');
+      setNewIPLabel('');
+      await fetchWhitelist();
+    } catch { /* ignore */ }
+    setIpLoading(false);
+  };
+
+  const handleAddMyIP = async () => {
+    if (!myIP) return;
+    setIpLoading(true);
+    try {
+      await fetch(`/api/auth/check-ip?action=add&ip=${encodeURIComponent(myIP)}&label=${encodeURIComponent('My Device')}`);
+      await fetchWhitelist();
+    } catch { /* ignore */ }
+    setIpLoading(false);
+  };
+
+  const handleRemoveIP = async (id: string) => {
+    setIpLoading(true);
+    try {
+      await fetch(`/api/auth/check-ip?action=remove&id=${encodeURIComponent(id)}`);
+      await fetchWhitelist();
+    } catch { /* ignore */ }
+    setIpLoading(false);
+  };
 
   if (!isOwner) {
     return (
@@ -228,6 +288,76 @@ export const SystemMonitorApp: React.FC = () => {
                   ))}
                 </AnimatePresence>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* IP Whitelist Manager */}
+        <section>
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <Globe size={14} className="text-white/50" />
+            <h3 className="text-[11px] tracking-widest text-white/50 uppercase">IP Whitelist</h3>
+            {myIP && (
+              <span className="ml-auto text-[10px] text-white/25 font-mono">Your IP: {myIP}</span>
+            )}
+          </div>
+
+          <div className="bg-[#121215] border border-white/5 rounded-lg p-4 space-y-3">
+            {/* Current whitelist */}
+            {whitelistedIPs.length === 0 ? (
+              <div className="text-[11px] text-white/25 text-center py-2">
+                No IP restrictions — all IPs can login.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {whitelistedIPs.map(entry => (
+                  <div key={entry.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 group">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[12px] font-mono text-white/60">{entry.ip}</span>
+                      <span className="text-[10px] text-white/25">{entry.label}</span>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveIP(entry.id)}
+                      disabled={ipLoading}
+                      className="text-white/10 hover:text-red-400/60 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add IP controls */}
+            <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+              <button
+                onClick={handleAddMyIP}
+                disabled={ipLoading || !myIP}
+                className="text-[10px] px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/40 hover:text-white/60 transition-all disabled:opacity-30 whitespace-nowrap"
+              >
+                + Add My IP
+              </button>
+              <input
+                type="text"
+                value={newIPInput}
+                onChange={e => setNewIPInput(e.target.value)}
+                placeholder="Custom IP"
+                className="flex-1 h-7 px-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/50 outline-none placeholder-white/15 focus:border-white/15"
+              />
+              <input
+                type="text"
+                value={newIPLabel}
+                onChange={e => setNewIPLabel(e.target.value)}
+                placeholder="Label"
+                className="w-24 h-7 px-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/50 outline-none placeholder-white/15 focus:border-white/15"
+              />
+              <button
+                onClick={handleAddIP}
+                disabled={ipLoading || !newIPInput.trim()}
+                className="h-7 w-7 flex items-center justify-center rounded bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/40 hover:text-white/60 transition-all disabled:opacity-30"
+              >
+                <Plus size={12} />
+              </button>
             </div>
           </div>
         </section>

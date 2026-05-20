@@ -78,6 +78,24 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
 
     try {
+      // ─── IP Whitelist Check (first line of defense) ────────
+      try {
+        const ipRes = await fetch('/api/auth/check-ip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const ipData = await ipRes.json();
+        if (ipData.success && !ipData.allowed) {
+          setError(`Access denied. Your IP (${ipData.ip}) is not authorized.`);
+          await logSystemEvent('ip_blocked_login', { ip: ipData.ip });
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // IP check failed — allow login (graceful degradation)
+        console.warn('[Auth] IP check failed, proceeding');
+      }
+
       // Use Firebase Auth REST API to verify password WITHOUT triggering onAuthStateChanged
       // This prevents the app from switching to the OS before OTP verification
       const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
