@@ -64,7 +64,7 @@ export const LoginScreen: React.FC = () => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // ─── Step 1: Password Login ───────────────────────────────
+  // ─── Step 1: Password Verification (via REST API — no auth state trigger) ─
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -78,16 +78,55 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      // Use Firebase Auth REST API to verify password WITHOUT triggering onAuthStateChanged
+      // This prevents the app from switching to the OS before OTP verification
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const restRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            returnSecureToken: true,
+          }),
+        }
+      );
 
-      // Server-side whitelist verification
-      const idToken = await cred.user.getIdToken();
+      if (!restRes.ok) {
+        const restError = await restRes.json().catch(() => ({}));
+        const errMsg = restError?.error?.message || '';
 
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+
+        await logSystemEvent('login_failed', { email, attempt: newAttempts });
+
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const lockUntil = Date.now() + LOCKOUT_DURATION_MS;
+          setLockedUntil(lockUntil);
+          setError('Too many failed attempts. System locked for 5 minutes.');
+          await logSystemEvent('account_lockout', { email, lockUntil: new Date(lockUntil).toISOString() });
+        } else if (errMsg === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
+          setError('Too many attempts. Try again later.');
+        } else {
+          setError(`Access denied. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
+        }
+        setLoading(false);
+        return;
+      }
+
+      const restData = await restRes.json();
+      const uid = restData.localId;
+      const userEmail = restData.email || email;
+
+      // Server-side whitelist check (using the REST token)
       try {
         const verifyRes = await fetch('/api/auth/verify', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${idToken}`,
+            'Authorization': `Bearer ${restData.idToken}`,
             'Content-Type': 'application/json',
           },
         });
@@ -95,7 +134,6 @@ export const LoginScreen: React.FC = () => {
         if (!verifyRes.ok) {
           const verifyData = await verifyRes.json().catch(() => ({}));
           if (verifyData.error === 'ACCESS_DENIED') {
-            await auth.signOut();
             setError('Access denied. This system is restricted to authorized personnel only.');
             setLoading(false);
             return;
@@ -106,12 +144,6 @@ export const LoginScreen: React.FC = () => {
       }
 
       // ─── Send OTP ─────────────────────────────────────────
-      const uid = cred.user.uid;
-      const userEmail = cred.user.email || email;
-
-      // Sign out temporarily — user must verify OTP to fully login
-      await auth.signOut();
-
       try {
         const otpRes = await fetch('/api/auth/send-otp', {
           method: 'POST',
@@ -131,7 +163,7 @@ export const LoginScreen: React.FC = () => {
         return;
       }
 
-      // Move to OTP step
+      // Move to OTP step (no auth state was triggered!)
       setPendingUid(uid);
       setOtpDigits(Array(OTP_LENGTH).fill(''));
       setOtpCountdown(300);
@@ -139,30 +171,13 @@ export const LoginScreen: React.FC = () => {
       setError('');
       setAttempts(0);
       setLockedUntil(null);
-    } catch (err: unknown) {
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-
-      await logSystemEvent('login_failed', { email, attempt: newAttempts });
-
-      if (newAttempts >= MAX_ATTEMPTS) {
-        const lockUntil = Date.now() + LOCKOUT_DURATION_MS;
-        setLockedUntil(lockUntil);
-        setError(`Too many failed attempts. System locked for 5 minutes.`);
-        await logSystemEvent('account_lockout', { email, lockUntil: new Date(lockUntil).toISOString() });
-      } else {
-        const code = (err as { code?: string })?.code || '';
-        if (code === 'auth/too-many-requests') {
-          setError('Too many attempts. Try again later.');
-        } else {
-          setError(`Access denied. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`);
-        }
-      }
+    } catch {
+      setError('Connection error. Please try again.');
     }
     setLoading(false);
   };
 
-  // ─── Step 2: Verify OTP ───────────────────────────────────
+  // ─── Step 2: Verify OTP → then do actual Firebase sign-in ─
   const handleOtpSubmit = async () => {
     const code = otpDigits.join('');
     if (code.length !== OTP_LENGTH) {
@@ -183,15 +198,13 @@ export const LoginScreen: React.FC = () => {
       const data = await res.json();
 
       if (res.ok && data.verified) {
-        // OTP verified — now complete the actual login
+        // OTP verified — NOW do the actual Firebase sign-in (this triggers auth state → enters OS)
         await signInWithEmailAndPassword(auth, email, password);
-
         await syncUserProfile(pendingUid, email, '');
         await logSystemEvent('login_success_2fa', { uid: pendingUid, email });
       } else {
         setError(data.message || 'Invalid verification code.');
         if (data.error === 'EXPIRED' || data.error === 'MAX_ATTEMPTS') {
-          // Go back to password step
           setTimeout(() => {
             setAuthStep('password');
             setError('');
@@ -204,6 +217,7 @@ export const LoginScreen: React.FC = () => {
 
     setLoading(false);
   };
+
 
   // ─── OTP Input Handlers ───────────────────────────────────
   const handleOtpChange = (index: number, value: string) => {
