@@ -16,7 +16,8 @@ interface ProviderStatus {
 
 interface LogEntry {
   id: string;
-  type: string;
+  type?: string;
+  event?: string;
   email: string;
   ip: string;
   timestamp: any;
@@ -182,13 +183,13 @@ export const SystemMonitorApp: React.FC = () => {
                       <span className="text-white/40 font-mono">{log.ip || 'Unknown'}</span>
                       <span className={cn(
                         "px-2 py-0.5 rounded text-[10px] w-fit border",
-                        log.type === 'LOGIN_SUCCESS' ? "bg-white/10 text-white border-white/20" :
-                        log.type === 'LOGIN_FAILED' ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                        log.type === 'PASSWORD_RESET' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                        log.type === 'ACCOUNT_LOCKOUT' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                        (log.type || log.event) === 'LOGIN_SUCCESS' ? "bg-white/10 text-white border-white/20" :
+                        (log.type || log.event) === 'LOGIN_FAILED' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                        (log.type || log.event) === 'PASSWORD_RESET' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                        (log.type || log.event) === 'ACCOUNT_LOCKOUT' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
                         "bg-white/5 text-white/50 border-white/10"
                       )}>
-                        {log.type.replace('_', ' ')}
+                        {((log.type || log.event || '') as string).replace(/_/g, ' ')}
                       </span>
                     </motion.div>
                   ))}
