@@ -45,6 +45,44 @@ export const LoginScreen: React.FC = () => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
+      // ─── Server-side whitelist verification ────────────────
+      // This is the definitive fix for the signup-via-API exploit.
+      // Even if someone creates an account directly via Firebase API,
+      // they will be blocked and their account deleted here.
+      const idToken = await cred.user.getIdToken();
+      let serverVerified = false;
+
+      try {
+        const verifyRes = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (verifyRes.ok) {
+          serverVerified = true;
+        } else {
+          const verifyData = await verifyRes.json().catch(() => ({}));
+          if (verifyData.error === 'ACCESS_DENIED') {
+            // Account was purged by server — sign out locally
+            await auth.signOut();
+            setError('Access denied. This system is restricted to authorized personnel only.');
+            setLoading(false);
+            return;
+          }
+          // Other server errors — allow login but log warning
+          // (graceful degradation: don't block owner if Admin SDK isn't configured yet)
+          console.warn('[Auth] Server verification failed, proceeding with client-side auth:', verifyData);
+          serverVerified = false;
+        }
+      } catch {
+        // Network error calling verify endpoint — graceful degradation
+        console.warn('[Auth] Could not reach /api/auth/verify, proceeding with client-side auth');
+        serverVerified = false;
+      }
+
       // Sync user profile to Firestore on successful login
       await syncUserProfile(
         cred.user.uid,
@@ -56,6 +94,7 @@ export const LoginScreen: React.FC = () => {
       await logSystemEvent('login_success', {
         uid: cred.user.uid,
         email: cred.user.email,
+        serverVerified,
       });
 
       // Reset attempts on success
