@@ -8,12 +8,13 @@
 // When one key hits rate limit → rotate to next key.
 // When ALL keys for a provider are on cooldown → fallback.
 //
-// Priority chain: Gemini (primary) → Groq (fallback)
+// Priority chain: Gemini (primary) → Groq (fallback) → DeepSeek (fallback)
 // ─────────────────────────────────────────────────────────────
 
 import { AIProviderInterface, AIRequestPayload, AIResponsePayload, AIProviderID } from './types';
 import { GeminiProvider } from './providers/gemini.provider';
 import { GroqProvider } from './providers/groq.provider';
+import { DeepSeekProvider } from './providers/deepseek.provider';
 
 // Track cooldown per key
 interface KeyStatus {
@@ -24,7 +25,7 @@ interface KeyStatus {
 
 export class AIRouter {
   private providers: Map<AIProviderID, AIProviderInterface> = new Map();
-  private providerOrder: AIProviderID[] = ['gemini', 'groq'];
+  private providerOrder: AIProviderID[] = ['gemini', 'groq', 'deepseek'];
   private currentProviderIndex: number = 0;
 
   // Track key health per provider
@@ -34,6 +35,7 @@ export class AIRouter {
     // Collect all keys from environment variables
     const geminiKeys = this.collectKeys('GEMINI_API_KEY');
     const groqKeys = this.collectKeys('GROQ_API_KEY');
+    const deepseekKeys = this.collectKeys('DEEPSEEK_API_KEY');
 
     if (geminiKeys.length > 0) {
       this.providers.set('gemini', new GeminiProvider(geminiKeys));
@@ -46,6 +48,14 @@ export class AIRouter {
     if (groqKeys.length > 0) {
       this.providers.set('groq', new GroqProvider(groqKeys));
       this.keyStatus.set('groq', groqKeys.map(k => ({
+        key: k,
+        cooldownUntil: 0,
+        failCount: 0,
+      })));
+    }
+    if (deepseekKeys.length > 0) {
+      this.providers.set('deepseek', new DeepSeekProvider(deepseekKeys));
+      this.keyStatus.set('deepseek', deepseekKeys.map(k => ({
         key: k,
         cooldownUntil: 0,
         failCount: 0,

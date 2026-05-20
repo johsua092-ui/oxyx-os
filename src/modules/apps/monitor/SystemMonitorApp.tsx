@@ -56,6 +56,17 @@ export const SystemMonitorApp: React.FC = () => {
     return () => clearInterval(interval);
   }, [isOwner, user]);
 
+  // System heartbeat — pings Firestore every 60s to keep dashboard alive
+  useEffect(() => {
+    if (!isOwner) return;
+    const pingHeartbeat = () => {
+      fetch('/api/system/heartbeat').catch(() => {});
+    };
+    pingHeartbeat();
+    const hbInterval = setInterval(pingHeartbeat, 60000);
+    return () => clearInterval(hbInterval);
+  }, [isOwner]);
+
   // Listen to Firestore Logs
   useEffect(() => {
     if (!isOwner) {

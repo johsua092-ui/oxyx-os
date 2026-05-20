@@ -3,7 +3,7 @@
 // Defines the contract for all AI providers in the system.
 // ─────────────────────────────────────────────────────────────
 
-export type AIProviderID = 'gemini' | 'groq';
+export type AIProviderID = 'gemini' | 'groq' | 'deepseek';
 
 export interface AIMessage {
   role: 'user' | 'assistant' | 'system';
