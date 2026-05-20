@@ -202,6 +202,13 @@ export const LoginScreen: React.FC = () => {
         await signInWithEmailAndPassword(auth, email, password);
         await syncUserProfile(pendingUid, email, '');
         await logSystemEvent('login_success_2fa', { uid: pendingUid, email });
+
+        // Send login notification email (fire-and-forget — don't block login)
+        fetch('/api/auth/notify-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, uid: pendingUid }),
+        }).catch(() => {});
       } else {
         setError(data.message || 'Invalid verification code.');
         if (data.error === 'EXPIRED' || data.error === 'MAX_ATTEMPTS') {
