@@ -11,13 +11,25 @@ import { useOxyxAI } from '../hooks/useOxyxAI';
 import { useOxyxAIStore, ChatMessage } from '../store/oxyxAIStore';
 import { ResponseRenderer } from './ResponseRenderer';
 import { ImageUploader } from './ImageUploader';
-import { SendHorizontal, Loader2 } from 'lucide-react';
+import { SendHorizontal, Loader2, Mic, MicOff, Volume2, VolumeX, Brain, Sparkles } from 'lucide-react';
 
 export const ChatPanel: React.FC = () => {
   const { messages, isProcessing, sendMessage } = useOxyxAI();
-  const { currentInput, setInput } = useOxyxAIStore();
+  const { 
+    currentInput, 
+    setInput,
+    selectedProvider,
+    setSelectedProvider,
+    conversationMemory,
+    setConversationMemory,
+    isListening,
+    setListening,
+    isSpeaking,
+    setSpeaking
+  } = useOxyxAIStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -25,6 +37,82 @@ export const ChatPanel: React.FC = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Speech Recognition setup
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = 'id-ID';
+
+        rec.onresult = (event: any) => {
+          const text = event.results[0][0].transcript;
+          if (text) {
+            setInput(text);
+            sendMessage(text);
+          }
+        };
+
+        rec.onend = () => {
+          setListening(false);
+        };
+
+        rec.onerror = () => {
+          setListening(false);
+        };
+
+        recognitionRef.current = rec;
+      }
+    }
+  }, [setInput, sendMessage, setListening]);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setListening(false);
+    } else {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        setSpeaking(false);
+      }
+      setListening(true);
+      recognitionRef.current.start();
+    }
+  };
+
+  const toggleSpeaking = () => {
+    if (isSpeaking) {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeaking(false);
+    } else {
+      // Find the last assistant message and read it
+      const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && !m.isLoading);
+      if (lastAssistantMsg) {
+        setSpeaking(true);
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          const cleanText = lastAssistantMsg.content.replace(/[*#`_\-]/g, '').trim();
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          const voices = window.speechSynthesis.getVoices();
+          let voice = voices.find(v => v.lang.startsWith('id') || v.lang.startsWith('en'));
+          if (voice) utterance.voice = voice;
+          utterance.onend = () => setSpeaking(false);
+          utterance.onerror = () => setSpeaking(false);
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+    }
+  };
 
   const handleSubmit = () => {
     if (isProcessing || (!currentInput.trim() && !useOxyxAIStore.getState().pendingImage)) return;
@@ -78,23 +166,92 @@ export const ChatPanel: React.FC = () => {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-white/5 bg-white/[0.02] px-4 py-3">
+      <div className="border-t border-white/5 bg-white/[0.02] px-4 py-3 space-y-2">
         <ImageUploader />
+        
+        {/* Model, Memory, Voice Controls */}
+        <div className="flex items-center justify-between text-[11px] px-1">
+          {/* Provider Selection */}
+          <div className="flex items-center gap-1 bg-white/[0.02] border border-white/5 rounded-lg p-0.5">
+            {(['auto', 'gemini', 'groq', 'deepseek'] as const).map((prov) => (
+              <button
+                key={prov}
+                onClick={() => setSelectedProvider(prov)}
+                className={`
+                  px-2 py-0.5 rounded text-[10px] uppercase font-mono tracking-wider transition-all duration-300
+                  ${selectedProvider === prov
+                    ? 'bg-white/10 text-white border border-white/10 shadow-sm shadow-white/5'
+                    : 'text-white/30 hover:text-white/60 border border-transparent'
+                  }
+                `}
+              >
+                {prov}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick toggles (Memory & Speak) */}
+          <div className="flex items-center gap-2">
+            {/* Memory toggle */}
+            <button
+              onClick={() => setConversationMemory(!conversationMemory)}
+              className={`
+                p-1.5 rounded-lg border transition-all duration-300 flex items-center gap-1.5
+                ${conversationMemory
+                  ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400/80 hover:text-emerald-400'
+                  : 'bg-white/[0.02] border-white/5 text-white/20 hover:text-white/40'
+                }
+              `}
+              title={conversationMemory ? "Conversation memory active" : "Memory inactive"}
+            >
+              <Brain size={12} />
+              <span className="text-[9px] uppercase tracking-wider font-mono">Memory</span>
+            </button>
+
+            {/* Read out loud toggle */}
+            <button
+              onClick={toggleSpeaking}
+              className={`
+                p-1.5 rounded-lg border transition-all duration-300 flex items-center gap-1.5
+                ${isSpeaking
+                  ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:text-purple-300 animate-pulse'
+                  : 'bg-white/[0.02] border-white/5 text-white/20 hover:text-white/40'
+                }
+              `}
+              title={isSpeaking ? "Speaking... (click to stop)" : "Text-to-speech off"}
+            >
+              {isSpeaking ? <Volume2 size={12} /> : <VolumeX size={12} />}
+              <span className="text-[9px] uppercase tracking-wider font-mono">TTS</span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex items-end gap-3">
-          <div className="flex-1 relative">
+          <div className="flex-1 relative flex items-center bg-white/[0.03] border border-white/8 rounded-xl px-2">
+            <button
+              onClick={toggleListening}
+              className={`
+                p-2 rounded-lg transition-all duration-300 mr-1
+                ${isListening
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse'
+                  : 'text-white/20 hover:text-white/50'
+                }
+              `}
+              title={isListening ? "Listening... (click to stop)" : "Voice input (Speaks back)"}
+            >
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
             <textarea
               ref={inputRef}
               value={currentInput}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Oxyx AI anything..."
+              placeholder={isListening ? "Listening..." : "Ask Oxyx AI anything..."}
               rows={1}
               className="
-                w-full bg-white/[0.03] border border-white/8 rounded-xl
-                px-4 py-3 text-[13px] text-white/80 placeholder-white/15
+                flex-1 bg-transparent
+                py-3 text-[13px] text-white/80 placeholder-white/15
                 resize-none outline-none
-                focus:border-white/15 focus:bg-white/[0.05]
-                transition-all duration-300
                 min-h-[44px] max-h-[120px]
               "
               style={{ overflow: 'hidden' }}

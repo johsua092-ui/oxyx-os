@@ -164,6 +164,34 @@ export class AIRouter {
     return this.executeWithFallback('chat', payload);
   }
 
+  // Force a specific provider (for Multi-Model Toggle)
+  async chatWithProvider(providerId: AIProviderID, payload: AIRequestPayload): Promise<AIResponsePayload> {
+    const provider = this.providers.get(providerId);
+    if (!provider) {
+      // Provider not available, fall back to auto
+      return this.chat(payload);
+    }
+
+    // Try the requested provider first
+    const originalIndex = this.currentProviderIndex;
+    this.currentProviderIndex = this.providerOrder.indexOf(providerId);
+
+    try {
+      if (!this.selectBestKey()) {
+        // No keys available, fall back to auto
+        this.currentProviderIndex = originalIndex;
+        return this.chat(payload);
+      }
+      const result = await provider.chat(payload);
+      this.markKeySuccess();
+      return result;
+    } catch {
+      // Requested provider failed, fall back to auto chain
+      this.currentProviderIndex = originalIndex;
+      return this.executeWithFallback('chat', payload);
+    }
+  }
+
   async analyzeImage(payload: AIRequestPayload): Promise<AIResponsePayload> {
     // For image analysis, prefer a vision-capable provider
     const visionProvider = this.providerOrder.find(id => {

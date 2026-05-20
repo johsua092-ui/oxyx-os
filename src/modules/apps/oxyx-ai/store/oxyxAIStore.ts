@@ -20,6 +20,7 @@ export interface ChatMessage {
 }
 
 export type OxyxMode = 'chat' | 'vision';
+export type AIProviderChoice = 'auto' | 'gemini' | 'groq' | 'deepseek';
 
 interface OxyxAIState {
   messages: ChatMessage[];
@@ -28,6 +29,10 @@ interface OxyxAIState {
   currentInput: string;
   pendingImage: { preview: string; base64: string; mimeType: string } | null;
   error: string | null;
+  selectedProvider: AIProviderChoice;
+  conversationMemory: boolean;
+  isListening: boolean;
+  isSpeaking: boolean;
 
   // Actions
   setMode: (mode: OxyxMode) => void;
@@ -39,6 +44,10 @@ interface OxyxAIState {
   setProcessing: (processing: boolean) => void;
   setError: (error: string | null) => void;
   clearChat: () => void;
+  setSelectedProvider: (provider: AIProviderChoice) => void;
+  setConversationMemory: (enabled: boolean) => void;
+  setListening: (listening: boolean) => void;
+  setSpeaking: (speaking: boolean) => void;
 }
 
 let messageCounter = 0;
@@ -51,6 +60,10 @@ export const useOxyxAIStore = create<OxyxAIState>((set) => ({
   currentInput: '',
   pendingImage: null,
   error: null,
+  selectedProvider: 'auto',
+  conversationMemory: true,
+  isListening: false,
+  isSpeaking: false,
 
   setMode: (mode) => set({ mode }),
   setInput: (currentInput) => set({ currentInput }),
@@ -104,4 +117,8 @@ export const useOxyxAIStore = create<OxyxAIState>((set) => ({
   setProcessing: (isProcessing) => set({ isProcessing }),
   setError: (error) => set({ error }),
   clearChat: () => set({ messages: [], error: null }),
+  setSelectedProvider: (selectedProvider) => set({ selectedProvider }),
+  setConversationMemory: (conversationMemory) => set({ conversationMemory }),
+  setListening: (isListening) => set({ isListening }),
+  setSpeaking: (isSpeaking) => set({ isSpeaking }),
 }));

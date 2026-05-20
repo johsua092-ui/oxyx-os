@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       messages?: AIMessage[];
       temperature?: number;
       maxTokens?: number;
+      preferredProvider?: string;
     };
 
     if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
@@ -101,24 +102,28 @@ export async function POST(request: NextRequest) {
     // Owner gets unrestricted AI, regular users get hardened prompt
     const systemPrompt = auth.isOwner ? OWNER_SYSTEM_PROMPT : USER_SYSTEM_PROMPT;
 
-    const response = await router.chat({
+    const chatPayload = {
       messages: body.messages,
       systemPrompt,
       temperature: body.temperature ?? 0.7,
       maxTokens: body.maxTokens ?? 4096,
-    });
+    };
 
-    // ─── Sanitize Response (hide provider info) ───────────
+    // Use preferred provider if specified, otherwise auto-route
+    const validProviders = ['gemini', 'groq', 'deepseek'];
+    const response = (body.preferredProvider && validProviders.includes(body.preferredProvider))
+      ? await router.chatWithProvider(body.preferredProvider as 'gemini' | 'groq' | 'deepseek', chatPayload)
+      : await router.chat(chatPayload);
+
+    // ─── Response (always include provider info) ──────────
     return NextResponse.json({
       success: true,
       data: {
         content: response.content,
-        // Strip provider info in production
-        ...(process.env.NODE_ENV !== 'production' && {
-          tokensUsed: response.tokensUsed,
-          latencyMs: response.latencyMs,
-          providerId: response.providerId,
-        }),
+        providerId: response.providerId,
+        model: response.model,
+        latencyMs: response.latencyMs,
+        tokensUsed: response.tokensUsed,
       },
     });
   } catch (error: unknown) {

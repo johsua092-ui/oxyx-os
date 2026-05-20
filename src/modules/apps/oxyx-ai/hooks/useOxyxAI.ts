@@ -20,6 +20,10 @@ export function useOxyxAI() {
     addAssistantMessage,
     setProcessing,
     setError,
+    selectedProvider,
+    conversationMemory,
+    isSpeaking,
+    setSpeaking,
   } = useOxyxAIStore();
 
   // Conversation ID — persists across messages in one session
@@ -86,10 +90,46 @@ export function useOxyxAI() {
     }
   }, []);
 
+  // Text-To-Speech function
+  const speakText = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    
+    // Stop any current speech
+    window.speechSynthesis.cancel();
+    
+    // Clean markdown characters for cleaner TTS output
+    const cleanText = text
+      .replace(/[*#`_\-]/g, '') // remove markdown characters
+      .replace(/\[.*?\]\(.*?\)/g, '') // remove links
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    // Try to find a good English or Indonesian voice
+    const voices = window.speechSynthesis.getVoices();
+    const isIndo = cleanText.match(/[a-zA-Z]/g) && (cleanText.includes('dan') || cleanText.includes('yang') || cleanText.includes('saya') || cleanText.includes('adalah'));
+    
+    let voice = voices.find(v => v.lang.startsWith(isIndo ? 'id' : 'en'));
+    if (!voice) voice = voices[0];
+    if (voice) utterance.voice = voice;
+
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    
+    setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }, [setSpeaking]);
+
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() && !pendingImage) return;
     setError(null);
     setProcessing(true);
+
+    // Stop speaking if new message is sent
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+    }
 
     // Add user message to store
     const image = pendingImage
@@ -105,9 +145,12 @@ export function useOxyxAI() {
       const hasImage = !!image;
       const endpoint = hasImage ? '/api/ai/analyze' : '/api/ai/chat';
 
-      // Filter and keep only the last 8 messages for token/rate-limit efficiency
-      const conversationHistory = messages.filter(m => !m.isLoading);
-      const trimmedHistory = conversationHistory.slice(-8);
+      // Trim history based on memory toggle
+      let trimmedHistory: typeof messages = [];
+      if (conversationMemory) {
+        const conversationHistory = messages.filter(m => !m.isLoading);
+        trimmedHistory = conversationHistory.slice(-8);
+      }
 
       // Build the messages payload for the API
       const apiMessages = [
@@ -135,7 +178,10 @@ export function useOxyxAI() {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` }),
         },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ 
+          messages: apiMessages,
+          preferredProvider: selectedProvider !== 'auto' ? selectedProvider : undefined
+        }),
       });
 
       const data = await response.json() as {
@@ -153,6 +199,12 @@ export function useOxyxAI() {
         model: data.data.model,
         latencyMs: data.data.latencyMs,
       });
+
+      // If user has speaking/listening enabled, read assistant reply
+      const storeState = useOxyxAIStore.getState();
+      if (storeState.isListening || storeState.isSpeaking) {
+        speakText(data.data.content);
+      }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMsg);
@@ -160,7 +212,7 @@ export function useOxyxAI() {
     } finally {
       setProcessing(false);
     }
-  }, [messages, pendingImage, addUserMessage, addAssistantMessage, setProcessing, setError]);
+  }, [messages, pendingImage, addUserMessage, addAssistantMessage, setProcessing, setError, conversationMemory, selectedProvider, setSpeaking, speakText]);
 
   return {
     messages,
