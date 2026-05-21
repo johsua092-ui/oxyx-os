@@ -30,6 +30,7 @@ export function useOxyxAI() {
 
   // Conversation ID — persists across messages in one session
   const conversationId = useRef<string>(`conv-${Date.now()}`);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-save to Firestore after each assistant response
   const saveToFirestore = useCallback(async () => {
@@ -174,6 +175,9 @@ export function useOxyxAI() {
       // Get Firebase auth token
       const token = await auth.currentUser?.getIdToken();
 
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -184,6 +188,7 @@ export function useOxyxAI() {
           messages: apiMessages,
           preferredProvider: selectedProvider !== 'auto' ? selectedProvider : undefined
         }),
+        signal: controller.signal,
       });
 
       const data = await response.json() as {
@@ -208,10 +213,15 @@ export function useOxyxAI() {
         speakText(data.data.content);
       }
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        addAssistantMessage(assistantId, 'Request cancelled.');
+        return;
+      }
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMsg);
       addAssistantMessage(assistantId, `System error: ${errorMsg}`);
     } finally {
+      abortControllerRef.current = null;
       setProcessing(false);
     }
   }, [messages, pendingImage, addUserMessage, addAssistantMessage, setProcessing, setError, conversationMemory, selectedProvider, setSpeaking, speakText]);
@@ -222,12 +232,19 @@ export function useOxyxAI() {
     conversationId.current = `conv-${Date.now()}`;
   }, []);
 
+  const cancelMessage = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
   return {
     messages,
     mode,
     isProcessing,
     error,
     sendMessage,
+    cancelMessage,
     loadConversation,
     startNewChat,
     conversationId: conversationId.current,

@@ -11,10 +11,10 @@ import { useOxyxAI } from '../hooks/useOxyxAI';
 import { useOxyxAIStore, ChatMessage } from '../store/oxyxAIStore';
 import { ResponseRenderer } from './ResponseRenderer';
 import { ImageUploader } from './ImageUploader';
-import { SendHorizontal, Loader2, Mic, MicOff, Volume2, VolumeX, Brain, Sparkles } from 'lucide-react';
+import { SendHorizontal, Loader2, Mic, MicOff, Volume2, VolumeX, Brain, Sparkles, X } from 'lucide-react';
 
 export const ChatPanel: React.FC = () => {
-  const { messages, isProcessing, sendMessage } = useOxyxAI();
+  const { messages, isProcessing, sendMessage, cancelMessage } = useOxyxAI();
   const { 
     currentInput, 
     setInput,
@@ -166,6 +166,12 @@ export const ChatPanel: React.FC = () => {
               ))}
             </div>
             <span className="text-[11px] text-white/20 tracking-wider uppercase">Processing</span>
+            <button
+              onClick={cancelMessage}
+              className="text-[9px] text-red-400/40 hover:text-red-400 bg-red-500/5 hover:bg-red-500/10 px-2 py-0.5 border border-red-500/10 hover:border-red-500/20 rounded font-mono uppercase transition-all duration-300"
+            >
+              Cancel
+            </button>
           </motion.div>
         )}
       </div>
@@ -269,19 +275,19 @@ export const ChatPanel: React.FC = () => {
             />
           </div>
           <button
-            onClick={handleSubmit}
-            disabled={isProcessing || (!currentInput.trim() && !useOxyxAIStore.getState().pendingImage)}
-            className="
-              p-3 rounded-xl
-              bg-white/[0.06] hover:bg-white/[0.1] 
-              border border-white/8 hover:border-white/15
-              text-white/40 hover:text-white/70
-              disabled:opacity-30 disabled:cursor-not-allowed
-              transition-all duration-300
-            "
+            onClick={isProcessing ? cancelMessage : handleSubmit}
+            disabled={!isProcessing && !currentInput.trim() && !useOxyxAIStore.getState().pendingImage}
+            className={`
+              p-3 rounded-xl border transition-all duration-300
+              ${isProcessing 
+                ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400' 
+                : 'bg-white/[0.06] hover:bg-white/[0.1] border-white/8 hover:border-white/15 text-white/40 hover:text-white/70'
+              }
+            `}
+            title={isProcessing ? "Cancel response" : "Send message"}
           >
             {isProcessing ? (
-              <Loader2 size={16} className="animate-spin" />
+              <X size={16} />
             ) : (
               <SendHorizontal size={16} strokeWidth={1.5} />
             )}
