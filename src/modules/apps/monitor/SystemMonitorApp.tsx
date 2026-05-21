@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Activity, Shield, Key, Server, Cpu, History, Globe, Plus, Trash2 } from 'lucide-react';
+import { Activity, Shield, Key, Server, Cpu, History, Globe, Plus, Trash2, Search, MessageSquare, Clock, User, RefreshCw, Sparkles } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
@@ -39,6 +39,38 @@ export const SystemMonitorApp: React.FC = () => {
   const [newIPLabel, setNewIPLabel] = useState('');
   const [ipLoading, setIpLoading] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+  // AI Session Inspector state
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [convLoading, setConvLoading] = useState(false);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [convSearch, setConvSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview' | 'inspector'>('overview');
+
+  const fetchConversations = async () => {
+    setConvLoading(true);
+    try {
+      const token = await user?.getIdToken();
+      const res = await fetch('/api/system/conversations', {
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+      const json = await res.json();
+      if (json.success) {
+        setConversations(json.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
+    }
+    setConvLoading(false);
+  };
+
+  const selectedConv = conversations.find(c => c.id === selectedConvId);
+  const filteredConvs = conversations.filter(conv => 
+    conv.email.toLowerCase().includes(convSearch.toLowerCase()) ||
+    conv.title.toLowerCase().includes(convSearch.toLowerCase())
+  );
 
   // Fetch AI Status periodically
   useEffect(() => {
@@ -185,220 +217,376 @@ export const SystemMonitorApp: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        
-        {/* AI Key Rotation Engine Status */}
-        <section>
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <Cpu size={14} className="text-white/50" />
-            <h3 className="text-[11px] tracking-widest text-white/50 uppercase">AI Token Engine</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {aiStatus.map((provider) => (
-              <div key={provider.id} className="bg-[#121215] border border-white/5 rounded-lg p-4 relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-2">
-                    <Server size={14} className="text-white/40" />
-                    <span className="text-[13px] font-medium">{provider.name}</span>
-                  </div>
-                  <div className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/[0.02]">
-                    {provider.id === 'gemini' ? 'PRIMARY' : 'FALLBACK'}
-                  </div>
-                </div>
+      {/* Tabs Menu */}
+      <div className="flex-none bg-[#0e0e11] px-4 border-b border-white/5 flex gap-4 select-none">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={cn(
+            "py-2.5 text-[11px] font-medium tracking-wider uppercase border-b-2 transition-all duration-300",
+            activeTab === 'overview'
+              ? "text-white border-white/70"
+              : "text-white/40 border-transparent hover:text-white/70"
+          )}
+        >
+          Overview & Firewall
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('inspector');
+            fetchConversations();
+          }}
+          className={cn(
+            "py-2.5 text-[11px] font-medium tracking-wider uppercase border-b-2 transition-all duration-300 flex items-center gap-1.5",
+            activeTab === 'inspector'
+              ? "text-purple-400 border-purple-500/70"
+              : "text-white/40 border-transparent hover:text-white/70"
+          )}
+        >
+          <Sparkles size={11} className={cn(activeTab === 'inspector' ? "text-purple-400" : "text-white/30")} />
+          AI Session Inspector
+        </button>
+      </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-[11px] text-white/40 mb-1">
-                      <span>Active Key</span>
-                      <span>{provider.activeKey} / {provider.totalKeys}</span>
-                    </div>
-                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-white/60 transition-all duration-500" 
-                        style={{ width: `${(provider.activeKey / provider.totalKeys) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/5">
-                    <span className="flex items-center gap-1.5 text-white/40">
-                      <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
-                      Available: {provider.keysAvailable}
-                    </span>
-                    {provider.keysOnCooldown > 0 && (
-                      <span className="flex items-center gap-1.5 text-white/50">
-                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400/80" />
-                        Cooldown: {provider.keysOnCooldown}
-                      </span>
-                    )}
-                  </div>
-                </div>
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'overview' ? (
+          <div className="h-full overflow-y-auto p-4 space-y-6">
+            {/* AI Key Rotation Engine Status */}
+            <section>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Cpu size={14} className="text-white/50" />
+                <h3 className="text-[11px] tracking-widest text-white/50 uppercase">AI Token Engine</h3>
               </div>
-            ))}
-            {aiStatus.length === 0 && (
-              <div className="col-span-2 p-6 text-center text-white/30 text-[12px] border border-dashed border-white/5 rounded-lg">
-                Loading AI Engine status...
-              </div>
-            )}
-          </div>
-        </section>
+              <div className="grid grid-cols-2 gap-3">
+                {aiStatus.map((provider) => (
+                  <div key={provider.id} className="bg-[#121215] border border-white/5 rounded-lg p-4 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-2">
+                        <Server size={14} className="text-white/40" />
+                        <span className="text-[13px] font-medium">{provider.name}</span>
+                      </div>
+                      <div className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/[0.02]">
+                        {provider.id === 'gemini' ? 'PRIMARY' : 'FALLBACK'}
+                      </div>
+                    </div>
 
-        {/* Security / System Logs */}
-        <section>
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <Shield size={14} className="text-white/50" />
-            <h3 className="text-[11px] tracking-widest text-white/50 uppercase">Security Audit Log</h3>
-          </div>
-          
-          <div className="bg-[#121215] border border-white/5 rounded-lg overflow-hidden flex flex-col">
-            <div className="grid grid-cols-[100px_1fr_120px_150px] gap-4 px-4 py-2 border-b border-white/5 bg-white/[0.02] text-[10px] text-white/30 uppercase tracking-wider">
-              <span>Time</span>
-              <span>Event / Email</span>
-              <span>IP Address</span>
-              <span>Type</span>
-            </div>
-            
-            <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto">
-              {loading ? (
-                <div className="p-4 text-center text-[11px] text-white/30">Syncing logs...</div>
-              ) : logs.length === 0 ? (
-                <div className="p-4 text-center text-[11px] text-white/30">No security events recorded.</div>
-              ) : (
-                <AnimatePresence initial={false}>
-                  {logs.map((log) => {
-                    const isExpanded = expandedLogId === log.id;
-                    return (
-                      <div key={log.id} className="flex flex-col border-b border-white/5 last:border-0">
-                        <motion.div 
-                          onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                          initial={{ opacity: 0, backgroundColor: 'rgba(255,255,255,0.05)' }}
-                          animate={{ opacity: 1, backgroundColor: 'transparent' }}
-                          className="grid grid-cols-[100px_1fr_120px_150px] gap-4 px-4 py-3 text-[11px] items-center hover:bg-white/[0.02] transition-colors cursor-pointer select-none"
-                        >
-                          <span className="text-white/40">{formatDate(log.timestamp)}</span>
-                          <span className="text-white/70 truncate">{log.email || log.details?.email || 'System'}</span>
-                          <span className="text-white/40 font-mono">{log.ip || log.details?.ip || 'Unknown'}</span>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[10px] w-fit border font-mono uppercase",
-                            (log.type || log.event) === 'LOGIN_SUCCESS' ? "bg-white/10 text-white border-white/20" :
-                            (log.type || log.event) === 'LOGIN_FAILED' ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                            (log.type || log.event) === 'PASSWORD_RESET' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                            (log.type || log.event) === 'ACCOUNT_LOCKOUT' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                            (log.type || log.event) === 'ai_chat_completed' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
-                            "bg-white/5 text-white/50 border-white/10"
-                          )}>
-                            {((log.type || log.event || '') as string).replace(/_/g, ' ')}
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-[11px] text-white/40 mb-1">
+                          <span>Active Key</span>
+                          <span>{provider.activeKey} / {provider.totalKeys}</span>
+                        </div>
+                        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-white/60 transition-all duration-500" 
+                            style={{ width: `${(provider.activeKey / provider.totalKeys) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/5">
+                        <span className="flex items-center gap-1.5 text-white/40">
+                          <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
+                          Available: {provider.keysAvailable}
+                        </span>
+                        {provider.keysOnCooldown > 0 && (
+                          <span className="flex items-center gap-1.5 text-white/50">
+                            <div className="w-1.5 h-1.5 rounded-full bg-orange-400/80" />
+                            Cooldown: {provider.keysOnCooldown}
                           </span>
-                        </motion.div>
-                        
-                        {isExpanded && (
-                          <div className="px-4 pb-4 pt-1 bg-white/[0.01] border-t border-white/[0.02] text-[10px] space-y-2 text-white/50 font-mono select-text">
-                            {log.event === 'ai_chat_completed' ? (
-                              <div className="space-y-2">
-                                <div className="grid grid-cols-2 gap-4 text-white/30 text-[9px] uppercase tracking-wider border-b border-white/5 pb-1">
-                                  <span>Model: {String(log.details?.model || 'Unknown')} ({String(log.details?.providerId || 'Unknown')})</span>
-                                  <span className="text-right">Latency: {String(log.details?.latencyMs || 0)}ms | Tokens: {String(log.details?.tokensUsed || 0)}</span>
-                                </div>
-                                <div className="space-y-1">
-                                  <span className="text-white/20 text-[9px] uppercase tracking-wider block">User Input:</span>
-                                  <div className="bg-black/20 border border-white/5 p-2 rounded max-h-[80px] overflow-y-auto whitespace-pre-wrap select-all">
-                                    {String(log.details?.input || '')}
-                                  </div>
-                                </div>
-                                <div className="space-y-1">
-                                  <span className="text-purple-400/30 text-[9px] uppercase tracking-wider block">AI Output:</span>
-                                  <div className="bg-black/20 border border-purple-500/5 p-2 rounded max-h-[120px] overflow-y-auto whitespace-pre-wrap select-all text-white/70">
-                                    {String(log.details?.output || '')}
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <pre className="bg-black/20 p-2 rounded max-h-[150px] overflow-y-auto text-white/40">
-                                {JSON.stringify(log.details || log, null, 2)}
-                              </pre>
-                            )}
-                          </div>
                         )}
                       </div>
+                    </div>
+                  </div>
+                ))}
+                {aiStatus.length === 0 && (
+                  <div className="col-span-2 p-6 text-center text-white/30 text-[12px] border border-dashed border-white/5 rounded-lg">
+                    Loading AI Engine status...
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Security / System Logs */}
+            <section>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Shield size={14} className="text-white/50" />
+                <h3 className="text-[11px] tracking-widest text-white/50 uppercase">Security Audit Log</h3>
+              </div>
+              
+              <div className="bg-[#121215] border border-white/5 rounded-lg overflow-hidden flex flex-col">
+                <div className="grid grid-cols-[100px_1fr_120px_150px] gap-4 px-4 py-2 border-b border-white/5 bg-white/[0.02] text-[10px] text-white/30 uppercase tracking-wider">
+                  <span>Time</span>
+                  <span>Event / Email</span>
+                  <span>IP Address</span>
+                  <span>Type</span>
+                </div>
+                
+                <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto">
+                  {loading ? (
+                    <div className="p-4 text-center text-[11px] text-white/30">Syncing logs...</div>
+                  ) : logs.length === 0 ? (
+                    <div className="p-4 text-center text-[11px] text-white/30">No security events recorded.</div>
+                  ) : (
+                    <AnimatePresence initial={false}>
+                      {logs.map((log) => {
+                        const isExpanded = expandedLogId === log.id;
+                        return (
+                          <div key={log.id} className="flex flex-col border-b border-white/5 last:border-0">
+                            <motion.div 
+                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                              initial={{ opacity: 0, backgroundColor: 'rgba(255,255,255,0.05)' }}
+                              animate={{ opacity: 1, backgroundColor: 'transparent' }}
+                              className="grid grid-cols-[100px_1fr_120px_150px] gap-4 px-4 py-3 text-[11px] items-center hover:bg-white/[0.02] transition-colors cursor-pointer select-none"
+                            >
+                              <span className="text-white/40">{formatDate(log.timestamp)}</span>
+                              <span className="text-white/70 truncate">{log.email || log.details?.email || 'System'}</span>
+                              <span className="text-white/40 font-mono">{log.ip || log.details?.ip || 'Unknown'}</span>
+                              <span className={cn(
+                                "px-2 py-0.5 rounded text-[10px] w-fit border font-mono uppercase",
+                                (log.type || log.event) === 'LOGIN_SUCCESS' ? "bg-white/10 text-white border-white/20" :
+                                (log.type || log.event) === 'LOGIN_FAILED' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                                (log.type || log.event) === 'PASSWORD_RESET' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                                (log.type || log.event) === 'ACCOUNT_LOCKOUT' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                                (log.type || log.event) === 'ai_chat_completed' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                                "bg-white/5 text-white/50 border-white/10"
+                              )}>
+                                {((log.type || log.event || '') as string).replace(/_/g, ' ')}
+                              </span>
+                            </motion.div>
+                            
+                            {isExpanded && (
+                              <div className="px-4 pb-4 pt-1 bg-white/[0.01] border-t border-white/[0.02] text-[10px] space-y-2 text-white/50 font-mono select-text">
+                                {log.event === 'ai_chat_completed' ? (
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-4 text-white/30 text-[9px] uppercase tracking-wider border-b border-white/5 pb-1">
+                                      <span>Model: {String(log.details?.model || 'Unknown')} ({String(log.details?.providerId || 'Unknown')})</span>
+                                      <span className="text-right">Latency: {String(log.details?.latencyMs || 0)}ms | Tokens: {String(log.details?.tokensUsed || 0)}</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="text-white/20 text-[9px] uppercase tracking-wider block">User Input:</span>
+                                      <div className="bg-black/20 border border-white/5 p-2 rounded max-h-[80px] overflow-y-auto whitespace-pre-wrap select-all">
+                                        {String(log.details?.input || '')}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="text-purple-400/30 text-[9px] uppercase tracking-wider block">AI Output:</span>
+                                      <div className="bg-black/20 border border-purple-500/5 p-2 rounded max-h-[120px] overflow-y-auto whitespace-pre-wrap select-all text-white/70">
+                                        {String(log.details?.output || '')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <pre className="bg-black/20 p-2 rounded max-h-[150px] overflow-y-auto text-white/40">
+                                    {JSON.stringify(log.details || log, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* IP Whitelist Manager */}
+            <section>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Globe size={14} className="text-white/50" />
+                <h3 className="text-[11px] tracking-widest text-white/50 uppercase">IP Whitelist</h3>
+                {myIP && (
+                  <span className="ml-auto text-[10px] text-white/25 font-mono">Your IP: {myIP}</span>
+                )}
+              </div>
+
+              <div className="bg-[#121215] border border-white/5 rounded-lg p-4 space-y-3">
+                {/* Current whitelist */}
+                {whitelistedIPs.length === 0 ? (
+                  <div className="text-[11px] text-white/25 text-center py-2">
+                    No IP restrictions — all IPs can login.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {whitelistedIPs.map(entry => (
+                      <div key={entry.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 group">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[12px] font-mono text-white/60">{entry.ip}</span>
+                          <span className="text-[10px] text-white/25">{entry.label}</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveIP(entry.id)}
+                          disabled={ipLoading}
+                          className="text-white/10 hover:text-red-400/60 transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add IP controls */}
+                <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                  <button
+                    onClick={handleAddMyIP}
+                    disabled={ipLoading || !myIP}
+                    className="text-[10px] px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/40 hover:text-white/60 transition-all disabled:opacity-30 whitespace-nowrap"
+                  >
+                    + Add My IP
+                  </button>
+                  <input
+                    type="text"
+                    value={newIPInput}
+                    onChange={e => setNewIPInput(e.target.value)}
+                    placeholder="Custom IP"
+                    className="flex-1 h-7 px-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/50 outline-none placeholder-white/15 focus:border-white/15"
+                  />
+                  <input
+                    type="text"
+                    value={newIPLabel}
+                    onChange={e => setNewIPLabel(e.target.value)}
+                    placeholder="Label"
+                    className="w-24 h-7 px-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/50 outline-none placeholder-white/15 focus:border-white/15"
+                  />
+                  <button
+                    onClick={handleAddIP}
+                    disabled={ipLoading || !newIPInput.trim()}
+                    className="h-7 w-7 flex items-center justify-center rounded bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/40 hover:text-white/60 transition-all disabled:opacity-30"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="h-full flex divide-x divide-white/5 bg-[#08080a] select-none overflow-hidden">
+            {/* Left Panel: Sesi list */}
+            <div className="w-[300px] flex flex-col h-full bg-[#0b0b0e] flex-none">
+              {/* Search & Refresh */}
+              <div className="p-3 border-b border-white/5 flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <Search size={12} className="absolute left-2.5 top-2.5 text-white/30" />
+                  <input
+                    type="text"
+                    value={convSearch}
+                    onChange={e => setConvSearch(e.target.value)}
+                    placeholder="Filter email / title..."
+                    className="w-full h-8 pl-8 pr-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/70 outline-none placeholder-white/20 focus:border-white/15 font-mono"
+                  />
+                </div>
+                <button
+                  onClick={fetchConversations}
+                  disabled={convLoading}
+                  className="h-8 w-8 flex items-center justify-center rounded bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] text-white/40 hover:text-white/60 transition-all disabled:opacity-30 flex-none"
+                  title="Refresh Sessions"
+                >
+                  <RefreshCw size={12} className={cn(convLoading && "animate-spin")} />
+                </button>
+              </div>
+
+              {/* Sessions List */}
+              <div className="flex-1 overflow-y-auto divide-y divide-white/5">
+                {convLoading && conversations.length === 0 ? (
+                  <div className="p-8 text-center text-[11px] text-white/30">Loading user sessions...</div>
+                ) : filteredConvs.length === 0 ? (
+                  <div className="p-8 text-center text-[11px] text-white/30">No conversations found.</div>
+                ) : (
+                  filteredConvs.map(conv => {
+                    const isSelected = selectedConvId === conv.id;
+                    const dateStr = new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    return (
+                      <div
+                        key={conv.id}
+                        onClick={() => setSelectedConvId(conv.id)}
+                        className={cn(
+                          "p-3 cursor-pointer transition-all flex flex-col gap-1",
+                          isSelected 
+                            ? "bg-purple-500/10 border-l-2 border-purple-500" 
+                            : "hover:bg-white/[0.02]"
+                        )}
+                      >
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className={cn("font-semibold truncate max-w-[180px]", isSelected ? "text-purple-300" : "text-white/80")}>
+                            {conv.email}
+                          </span>
+                          <span className="text-[9px] text-white/20 font-mono">{dateStr}</span>
+                        </div>
+                        <div className="text-[10px] text-white/40 truncate">
+                          {conv.title}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] text-white/20 mt-1">
+                          <MessageSquare size={10} />
+                          <span>{conv.messageCount} messages</span>
+                        </div>
+                      </div>
                     );
-                  })}
-                </AnimatePresence>
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Panel: Chat log viewer */}
+            <div className="flex-1 flex flex-col h-full bg-[#08080a] overflow-hidden select-text">
+              {selectedConv ? (
+                <>
+                  {/* Selected Session Header */}
+                  <div className="p-4 border-b border-white/5 bg-[#0e0e11] flex items-center justify-between flex-none">
+                    <div>
+                      <div className="text-[12px] font-bold text-white/80">{selectedConv.email}</div>
+                      <div className="text-[10px] text-white/30">{selectedConv.title}</div>
+                    </div>
+                    <div className="text-[9px] text-white/20 bg-white/5 border border-white/10 px-2 py-0.5 rounded font-mono uppercase">
+                      ID: {selectedConv.id}
+                    </div>
+                  </div>
+
+                  {/* Messages Transcripts */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {selectedConv.messages.map((msg: any, idx: number) => {
+                      const isUser = msg.role === 'user';
+                      return (
+                        <div key={idx} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+                          <div className="flex items-center gap-1.5 mb-1 px-1 text-[9px] text-white/30 uppercase tracking-wider font-mono">
+                            {isUser ? (
+                              <>
+                                <span>User Prompt</span>
+                                <User size={10} />
+                              </>
+                            ) : (
+                              <>
+                                <Cpu size={10} className="text-purple-400" />
+                                <span className="text-purple-400 font-semibold">AI Response</span>
+                              </>
+                            )}
+                          </div>
+                          
+                          <div className={cn(
+                            "max-w-[85%] rounded-xl px-4 py-2.5 text-[12px] border font-mono whitespace-pre-wrap select-all leading-relaxed",
+                            isUser 
+                              ? "bg-white/[0.04] border-white/5 text-white/85 rounded-tr-sm" 
+                              : "bg-purple-500/5 border-purple-500/10 text-white/75 rounded-tl-sm"
+                          )}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="h-full w-full flex flex-col items-center justify-center font-mono text-white/20 gap-2 p-8 text-center select-none">
+                  <MessageSquare size={32} className="text-white/10" strokeWidth={1.5} />
+                  <div className="text-[11px] font-semibold uppercase tracking-widest text-white/30">AI SESSION INSPECTOR</div>
+                  <div className="text-[10px] text-white/15 max-w-[250px]">Select a user conversation session from the left column to view the full audit logs and prompt transcript.</div>
+                </div>
               )}
             </div>
           </div>
-        </section>
-
-        {/* IP Whitelist Manager */}
-        <section>
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <Globe size={14} className="text-white/50" />
-            <h3 className="text-[11px] tracking-widest text-white/50 uppercase">IP Whitelist</h3>
-            {myIP && (
-              <span className="ml-auto text-[10px] text-white/25 font-mono">Your IP: {myIP}</span>
-            )}
-          </div>
-
-          <div className="bg-[#121215] border border-white/5 rounded-lg p-4 space-y-3">
-            {/* Current whitelist */}
-            {whitelistedIPs.length === 0 ? (
-              <div className="text-[11px] text-white/25 text-center py-2">
-                No IP restrictions — all IPs can login.
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {whitelistedIPs.map(entry => (
-                  <div key={entry.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 group">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[12px] font-mono text-white/60">{entry.ip}</span>
-                      <span className="text-[10px] text-white/25">{entry.label}</span>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveIP(entry.id)}
-                      disabled={ipLoading}
-                      className="text-white/10 hover:text-red-400/60 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add IP controls */}
-            <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-              <button
-                onClick={handleAddMyIP}
-                disabled={ipLoading || !myIP}
-                className="text-[10px] px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/40 hover:text-white/60 transition-all disabled:opacity-30 whitespace-nowrap"
-              >
-                + Add My IP
-              </button>
-              <input
-                type="text"
-                value={newIPInput}
-                onChange={e => setNewIPInput(e.target.value)}
-                placeholder="Custom IP"
-                className="flex-1 h-7 px-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/50 outline-none placeholder-white/15 focus:border-white/15"
-              />
-              <input
-                type="text"
-                value={newIPLabel}
-                onChange={e => setNewIPLabel(e.target.value)}
-                placeholder="Label"
-                className="w-24 h-7 px-2 bg-white/[0.03] border border-white/[0.06] rounded text-[11px] text-white/50 outline-none placeholder-white/15 focus:border-white/15"
-              />
-              <button
-                onClick={handleAddIP}
-                disabled={ipLoading || !newIPInput.trim()}
-                className="h-7 w-7 flex items-center justify-center rounded bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/40 hover:text-white/60 transition-all disabled:opacity-30"
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-          </div>
-        </section>
-
+        )}
       </div>
     </div>
   );
