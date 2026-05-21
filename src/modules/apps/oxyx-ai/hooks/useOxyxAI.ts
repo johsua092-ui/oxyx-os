@@ -24,6 +24,8 @@ export function useOxyxAI() {
     conversationMemory,
     isSpeaking,
     setSpeaking,
+    ttsEnabled,
+    setTtsEnabled,
   } = useOxyxAIStore();
 
   // Conversation ID — persists across messages in one session
@@ -202,7 +204,7 @@ export function useOxyxAI() {
 
       // If user has speaking/listening enabled, read assistant reply
       const storeState = useOxyxAIStore.getState();
-      if (storeState.isListening || storeState.isSpeaking) {
+      if (storeState.isListening || storeState.ttsEnabled) {
         speakText(data.data.content);
       }
     } catch (err: unknown) {
@@ -214,6 +216,12 @@ export function useOxyxAI() {
     }
   }, [messages, pendingImage, addUserMessage, addAssistantMessage, setProcessing, setError, conversationMemory, selectedProvider, setSpeaking, speakText]);
 
+  const startNewChat = useCallback(() => {
+    const store = useOxyxAIStore.getState();
+    store.clearChat();
+    conversationId.current = `conv-${Date.now()}`;
+  }, []);
+
   return {
     messages,
     mode,
@@ -221,6 +229,7 @@ export function useOxyxAI() {
     error,
     sendMessage,
     loadConversation,
+    startNewChat,
     conversationId: conversationId.current,
   };
 }

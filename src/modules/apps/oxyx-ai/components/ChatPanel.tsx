@@ -25,7 +25,9 @@ export const ChatPanel: React.FC = () => {
     isListening,
     setListening,
     isSpeaking,
-    setSpeaking
+    setSpeaking,
+    ttsEnabled,
+    setTtsEnabled
   } = useOxyxAIStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -89,13 +91,16 @@ export const ChatPanel: React.FC = () => {
   };
 
   const toggleSpeaking = () => {
-    if (isSpeaking) {
+    const nextState = !ttsEnabled;
+    setTtsEnabled(nextState);
+
+    if (!nextState) {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
       setSpeaking(false);
     } else {
-      // Find the last assistant message and read it
+      // Find the last assistant message and read it immediately
       const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && !m.isLoading);
       if (lastAssistantMsg) {
         setSpeaking(true);
@@ -213,14 +218,15 @@ export const ChatPanel: React.FC = () => {
               onClick={toggleSpeaking}
               className={`
                 p-1.5 rounded-lg border transition-all duration-300 flex items-center gap-1.5
-                ${isSpeaking
-                  ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:text-purple-300 animate-pulse'
+                ${ttsEnabled
+                  ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:text-purple-300'
                   : 'bg-white/[0.02] border-white/5 text-white/20 hover:text-white/40'
                 }
+                ${isSpeaking ? 'animate-pulse' : ''}
               `}
-              title={isSpeaking ? "Speaking... (click to stop)" : "Text-to-speech off"}
+              title={ttsEnabled ? "Text-to-speech active" : "Text-to-speech off"}
             >
-              {isSpeaking ? <Volume2 size={12} /> : <VolumeX size={12} />}
+              {ttsEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
               <span className="text-[9px] uppercase tracking-wider font-mono">TTS</span>
             </button>
           </div>

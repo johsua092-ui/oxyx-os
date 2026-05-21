@@ -33,6 +33,7 @@ interface OxyxAIState {
   conversationMemory: boolean;
   isListening: boolean;
   isSpeaking: boolean;
+  ttsEnabled: boolean;
 
   // Actions
   setMode: (mode: OxyxMode) => void;
@@ -48,6 +49,7 @@ interface OxyxAIState {
   setConversationMemory: (enabled: boolean) => void;
   setListening: (listening: boolean) => void;
   setSpeaking: (speaking: boolean) => void;
+  setTtsEnabled: (enabled: boolean) => void;
 }
 
 let messageCounter = 0;
@@ -64,6 +66,7 @@ export const useOxyxAIStore = create<OxyxAIState>((set) => ({
   conversationMemory: true,
   isListening: false,
   isSpeaking: false,
+  ttsEnabled: false,
 
   setMode: (mode) => set({ mode }),
   setInput: (currentInput) => set({ currentInput }),
@@ -121,4 +124,5 @@ export const useOxyxAIStore = create<OxyxAIState>((set) => ({
   setConversationMemory: (conversationMemory) => set({ conversationMemory }),
   setListening: (isListening) => set({ isListening }),
   setSpeaking: (isSpeaking) => set({ isSpeaking }),
+  setTtsEnabled: (ttsEnabled) => set({ ttsEnabled }),
 }));

@@ -23,6 +23,7 @@ interface LogEntry {
   ip: string;
   timestamp: any;
   userAgent?: string;
+  details?: Record<string, any>;
 }
 
 export const SystemMonitorApp: React.FC = () => {
@@ -37,6 +38,7 @@ export const SystemMonitorApp: React.FC = () => {
   const [newIPInput, setNewIPInput] = useState('');
   const [newIPLabel, setNewIPLabel] = useState('');
   const [ipLoading, setIpLoading] = useState(false);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   // Fetch AI Status periodically
   useEffect(() => {
@@ -257,35 +259,70 @@ export const SystemMonitorApp: React.FC = () => {
               <span>Type</span>
             </div>
             
-            <div className="divide-y divide-white/5 max-h-[250px] overflow-y-auto">
+            <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto">
               {loading ? (
                 <div className="p-4 text-center text-[11px] text-white/30">Syncing logs...</div>
               ) : logs.length === 0 ? (
                 <div className="p-4 text-center text-[11px] text-white/30">No security events recorded.</div>
               ) : (
                 <AnimatePresence initial={false}>
-                  {logs.map((log) => (
-                    <motion.div 
-                      key={log.id}
-                      initial={{ opacity: 0, backgroundColor: 'rgba(255,255,255,0.05)' }}
-                      animate={{ opacity: 1, backgroundColor: 'transparent' }}
-                      className="grid grid-cols-[100px_1fr_120px_150px] gap-4 px-4 py-3 text-[11px] items-center hover:bg-white/[0.02] transition-colors"
-                    >
-                      <span className="text-white/40">{formatDate(log.timestamp)}</span>
-                      <span className="text-white/70 truncate">{log.email}</span>
-                      <span className="text-white/40 font-mono">{log.ip || 'Unknown'}</span>
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[10px] w-fit border",
-                        (log.type || log.event) === 'LOGIN_SUCCESS' ? "bg-white/10 text-white border-white/20" :
-                        (log.type || log.event) === 'LOGIN_FAILED' ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                        (log.type || log.event) === 'PASSWORD_RESET' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                        (log.type || log.event) === 'ACCOUNT_LOCKOUT' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                        "bg-white/5 text-white/50 border-white/10"
-                      )}>
-                        {((log.type || log.event || '') as string).replace(/_/g, ' ')}
-                      </span>
-                    </motion.div>
-                  ))}
+                  {logs.map((log) => {
+                    const isExpanded = expandedLogId === log.id;
+                    return (
+                      <div key={log.id} className="flex flex-col border-b border-white/5 last:border-0">
+                        <motion.div 
+                          onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                          initial={{ opacity: 0, backgroundColor: 'rgba(255,255,255,0.05)' }}
+                          animate={{ opacity: 1, backgroundColor: 'transparent' }}
+                          className="grid grid-cols-[100px_1fr_120px_150px] gap-4 px-4 py-3 text-[11px] items-center hover:bg-white/[0.02] transition-colors cursor-pointer select-none"
+                        >
+                          <span className="text-white/40">{formatDate(log.timestamp)}</span>
+                          <span className="text-white/70 truncate">{log.email || log.details?.email || 'System'}</span>
+                          <span className="text-white/40 font-mono">{log.ip || log.details?.ip || 'Unknown'}</span>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[10px] w-fit border font-mono uppercase",
+                            (log.type || log.event) === 'LOGIN_SUCCESS' ? "bg-white/10 text-white border-white/20" :
+                            (log.type || log.event) === 'LOGIN_FAILED' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                            (log.type || log.event) === 'PASSWORD_RESET' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                            (log.type || log.event) === 'ACCOUNT_LOCKOUT' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                            (log.type || log.event) === 'ai_chat_completed' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                            "bg-white/5 text-white/50 border-white/10"
+                          )}>
+                            {((log.type || log.event || '') as string).replace(/_/g, ' ')}
+                          </span>
+                        </motion.div>
+                        
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-1 bg-white/[0.01] border-t border-white/[0.02] text-[10px] space-y-2 text-white/50 font-mono select-text">
+                            {log.event === 'ai_chat_completed' ? (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-4 text-white/30 text-[9px] uppercase tracking-wider border-b border-white/5 pb-1">
+                                  <span>Model: {String(log.details?.model || 'Unknown')} ({String(log.details?.providerId || 'Unknown')})</span>
+                                  <span className="text-right">Latency: {String(log.details?.latencyMs || 0)}ms | Tokens: {String(log.details?.tokensUsed || 0)}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-white/20 text-[9px] uppercase tracking-wider block">User Input:</span>
+                                  <div className="bg-black/20 border border-white/5 p-2 rounded max-h-[80px] overflow-y-auto whitespace-pre-wrap select-all">
+                                    {String(log.details?.input || '')}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-purple-400/30 text-[9px] uppercase tracking-wider block">AI Output:</span>
+                                  <div className="bg-black/20 border border-purple-500/5 p-2 rounded max-h-[120px] overflow-y-auto whitespace-pre-wrap select-all text-white/70">
+                                    {String(log.details?.output || '')}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <pre className="bg-black/20 p-2 rounded max-h-[150px] overflow-y-auto text-white/40">
+                                {JSON.stringify(log.details || log, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </AnimatePresence>
               )}
             </div>
