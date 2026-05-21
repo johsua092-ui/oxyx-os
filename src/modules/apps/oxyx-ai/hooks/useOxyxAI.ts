@@ -207,9 +207,9 @@ export function useOxyxAI() {
         latencyMs: data.data.latencyMs,
       });
 
-      // If user has speaking/listening enabled, read assistant reply
+      // If TTS is enabled, auto-read the AI response aloud
       const storeState = useOxyxAIStore.getState();
-      if (storeState.isListening || storeState.ttsEnabled) {
+      if (storeState.ttsEnabled) {
         speakText(data.data.content);
       }
     } catch (err: unknown) {

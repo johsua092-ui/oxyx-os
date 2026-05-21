@@ -32,6 +32,7 @@ export const ChatPanel: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
+  const voiceTriggeredRef = useRef(false);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -51,10 +52,14 @@ export const ChatPanel: React.FC = () => {
         rec.lang = 'id-ID';
 
         rec.onresult = (event: any) => {
-          const text = event.results[0][0].transcript;
-          if (text) {
+          const text = event.results[0]?.[0]?.transcript;
+          if (text && text.trim()) {
+            voiceTriggeredRef.current = true;
             setInput(text);
-            sendMessage(text);
+            // Small delay to let recognition cleanup before sending
+            setTimeout(() => {
+              sendMessage(text);
+            }, 150);
           }
         };
 
@@ -62,7 +67,11 @@ export const ChatPanel: React.FC = () => {
           setListening(false);
         };
 
-        rec.onerror = () => {
+        rec.onerror = (event: any) => {
+          // 'no-speech' is normal — user pressed mic but didn't speak
+          if (event.error !== 'no-speech') {
+            console.warn('[Voice] Recognition error:', event.error);
+          }
           setListening(false);
         };
 
@@ -78,15 +87,26 @@ export const ChatPanel: React.FC = () => {
     }
 
     if (isListening) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch { /* ignore */ }
       setListening(false);
     } else {
+      // Cancel any ongoing TTS before listening
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
         setSpeaking(false);
       }
       setListening(true);
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // Already running — abort and restart
+        try {
+          recognitionRef.current.stop();
+          setTimeout(() => {
+            recognitionRef.current.start();
+          }, 100);
+        } catch { setListening(false); }
+      }
     }
   };
 
