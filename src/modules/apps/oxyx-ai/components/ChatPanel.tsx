@@ -134,12 +134,27 @@ export const ChatPanel: React.FC = () => {
       } catch (err: any) {
         console.error('[Voice] getUserMedia error:', err);
         let detail = err.name || 'UnknownError';
+        
+        let devicesList: string[] = [];
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioDevices = devices.filter(d => d.kind === 'audioinput');
+            devicesList = audioDevices.map((d, index) => d.label || `Microphone ${index + 1} (${d.deviceId.substring(0, 5)}...)`);
+          }
+        } catch (e) {
+          console.error('[Voice] Failed to enumerate devices:', e);
+        }
+
+        const deviceCount = devicesList.length;
+        const deviceString = deviceCount > 0 ? ` (Terdeteksi ${deviceCount} mic: ${devicesList.join(', ')})` : " (Tidak ada hardware mic terdeteksi)";
+
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setMicError("Akses mikrofon ditolak oleh sistem operasi Windows atau browser Anda. Silakan cek Setelan Privasi Mikrofon di Windows.");
+          setMicError(`Akses mikrofon ditolak oleh Windows atau browser Anda. Pastikan Chrome memiliki izin mic dan tidak diblokir di Windows Privacy Settings.${deviceString}`);
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          setMicError("Hardware Microphone tidak terdeteksi. Pastikan microphone sudah tertancap dan aktif di komputer Anda.");
+          setMicError(`Hardware Microphone tidak ditemukan atau tidak aktif.${deviceString}`);
         } else {
-          setMicError(`Gagal akses mic (${detail}): ${err.message || 'Izin ditolak'}`);
+          setMicError(`Gagal akses mic (${detail}): ${err.message || 'Izin ditolak'}${deviceString}`);
         }
         return;
       }
