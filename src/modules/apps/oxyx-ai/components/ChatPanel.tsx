@@ -131,8 +131,16 @@ export const ChatPanel: React.FC = () => {
           // Immediately stop the stream track, we just want to trigger the browser prompt
           stream.getTracks().forEach(track => track.stop());
         }
-      } catch (err) {
-        setMicError("Akses mikrofon ditolak oleh sistem/browser.");
+      } catch (err: any) {
+        console.error('[Voice] getUserMedia error:', err);
+        let detail = err.name || 'UnknownError';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setMicError("Akses mikrofon ditolak oleh sistem operasi Windows atau browser Anda. Silakan cek Setelan Privasi Mikrofon di Windows.");
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setMicError("Hardware Microphone tidak terdeteksi. Pastikan microphone sudah tertancap dan aktif di komputer Anda.");
+        } else {
+          setMicError(`Gagal akses mic (${detail}): ${err.message || 'Izin ditolak'}`);
+        }
         return;
       }
 
