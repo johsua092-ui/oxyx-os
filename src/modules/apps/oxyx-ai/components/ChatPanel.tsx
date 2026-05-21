@@ -41,6 +41,8 @@ export const ChatPanel: React.FC = () => {
     }
   }, [messages]);
 
+  const [micError, setMicError] = React.useState<string | null>(null);
+
   // Keep a stable ref to sendMessage so the recognition callback
   // always calls the latest version without triggering effect re-runs
   const sendMessageRef = useRef(sendMessage);
@@ -56,6 +58,10 @@ export const ChatPanel: React.FC = () => {
     rec.continuous = false;
     rec.interimResults = false;
     rec.lang = 'id-ID';
+
+    rec.onstart = () => {
+      setMicError(null);
+    };
 
     rec.onresult = (event: any) => {
       const text = event.results[0]?.[0]?.transcript;
@@ -74,8 +80,21 @@ export const ChatPanel: React.FC = () => {
     };
 
     rec.onerror = (event: any) => {
+      console.warn('[Voice] Recognition error event:', event);
+      let errMsg = 'Gagal menggunakan microphone.';
+      if (event.error === 'not-allowed') {
+        errMsg = 'Permission mic diblokir oleh browser. Harap izinkan akses microphone di alamat URL web ini.';
+      } else if (event.error === 'no-speech') {
+        errMsg = 'Tidak ada suara terdengar. Silakan coba lagi.';
+      } else if (event.error === 'network') {
+        errMsg = 'Koneksi internet bermasalah untuk recognition.';
+      } else {
+        errMsg = `Error mic: ${event.error}`;
+      }
+      
+      // Don't spam no-speech alerts, but show on console
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        console.warn('[Voice] Recognition error:', event.error);
+        setMicError(errMsg);
       }
       setListening(false);
     };
@@ -88,9 +107,9 @@ export const ChatPanel: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps — only create recognition ONCE
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
     if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in this browser.");
+      alert("Browser Anda tidak mendukung Speech Recognition (Web Speech API). Harap gunakan Chrome, Edge, atau Safari.");
       return;
     }
 
@@ -98,15 +117,29 @@ export const ChatPanel: React.FC = () => {
       try { recognitionRef.current.stop(); } catch { /* ignore */ }
       setListening(false);
     } else {
+      setMicError(null);
       // Cancel any ongoing TTS before listening
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
         setSpeaking(false);
       }
+
+      // Request media permission explicitly first to ensure browser doesn't block silently
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Immediately stop the stream track, we just want to trigger the browser prompt
+          stream.getTracks().forEach(track => track.stop());
+        }
+      } catch (err) {
+        setMicError("Akses mikrofon ditolak oleh sistem/browser.");
+        return;
+      }
+
       setListening(true);
       try {
         recognitionRef.current.start();
-      } catch {
+      } catch (err) {
         // Already running — abort and restart
         try {
           recognitionRef.current.stop();
@@ -265,6 +298,18 @@ export const ChatPanel: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {micError && (
+          <div className="flex items-center justify-between text-[11px] bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-lg">
+            <span>{micError}</span>
+            <button 
+              onClick={() => setMicError(null)} 
+              className="text-[9px] hover:text-red-300 font-mono uppercase ml-2 bg-white/5 px-1 py-0.5 rounded"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         <div className="flex items-end gap-3">
           <div className="flex-1 relative flex items-center bg-white/[0.03] border border-white/8 rounded-xl px-2">
