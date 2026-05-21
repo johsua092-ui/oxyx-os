@@ -41,44 +41,52 @@ export const ChatPanel: React.FC = () => {
     }
   }, [messages]);
 
-  // Speech Recognition setup
+  // Keep a stable ref to sendMessage so the recognition callback
+  // always calls the latest version without triggering effect re-runs
+  const sendMessageRef = useRef(sendMessage);
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+
+  // Speech Recognition setup — runs ONCE on mount only
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const rec = new SpeechRecognition();
-        rec.continuous = false;
-        rec.interimResults = false;
-        rec.lang = 'id-ID';
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
 
-        rec.onresult = (event: any) => {
-          const text = event.results[0]?.[0]?.transcript;
-          if (text && text.trim()) {
-            voiceTriggeredRef.current = true;
-            setInput(text);
-            // Small delay to let recognition cleanup before sending
-            setTimeout(() => {
-              sendMessage(text);
-            }, 150);
-          }
-        };
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = 'id-ID';
 
-        rec.onend = () => {
-          setListening(false);
-        };
-
-        rec.onerror = (event: any) => {
-          // 'no-speech' is normal — user pressed mic but didn't speak
-          if (event.error !== 'no-speech') {
-            console.warn('[Voice] Recognition error:', event.error);
-          }
-          setListening(false);
-        };
-
-        recognitionRef.current = rec;
+    rec.onresult = (event: any) => {
+      const text = event.results[0]?.[0]?.transcript;
+      if (text && text.trim()) {
+        voiceTriggeredRef.current = true;
+        setInput(text);
+        // Small delay to let recognition fully cleanup before sending
+        setTimeout(() => {
+          sendMessageRef.current(text);
+        }, 200);
       }
-    }
-  }, [setInput, sendMessage, setListening]);
+    };
+
+    rec.onend = () => {
+      setListening(false);
+    };
+
+    rec.onerror = (event: any) => {
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        console.warn('[Voice] Recognition error:', event.error);
+      }
+      setListening(false);
+    };
+
+    recognitionRef.current = rec;
+
+    return () => {
+      try { rec.stop(); } catch { /* cleanup */ }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps — only create recognition ONCE
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
